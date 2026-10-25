@@ -100,7 +100,15 @@ No Python installation required! Download the standalone executable from [Releas
    .\nahan-deployer-windows-x64.exe
    ```
 
-#### B. Run with Python CLI
+#### B. Run on Linux / macOS (Standalone Binary)
+1. Download **`nahan-deployer-linux-x64`** (or **`nahan-deployer-macos`**).
+2. Open your terminal, grant execution permissions, and run it:
+   ```bash
+   chmod +x nahan-deployer-linux-x64
+   ./nahan-deployer-linux-x64
+   ```
+
+#### C. Run with Python CLI
 ```bash
 python3 deploy.py
 # Or: npm run deploy:cli

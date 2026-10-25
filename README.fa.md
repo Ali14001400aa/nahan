@@ -84,7 +84,15 @@
    .\nahan-deployer-windows-x64.exe
    ```
 
-#### ب) اجرا از طریق سورس پایتون
+#### ب) اجرا در لینوکس / macOS (فایل باینری مستقل)
+1. فایل **`nahan-deployer-linux-x64`** (یا `nahan-deployer-macos`) را دانلود کنید.
+2. ترمینال را باز کرده، دسترسی اجرا بدهید و برنامه را اجرا کنید:
+   ```bash
+   chmod +x nahan-deployer-linux-x64
+   ./nahan-deployer-linux-x64
+   ```
+
+#### ج) اجرا از طریق سورس پایتون
 ```bash
 python3 deploy.py
 # یا: npm run deploy:cli
