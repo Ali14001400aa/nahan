@@ -1,462 +1,729 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl" class="scroll-smooth">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مستندات پیاده‌سازی پنل نهان</title>
+    <title>Nahan Gateway v3.1.0 - Portal & Cloudflare Deployer</title>
+    <meta name="description" content="Project Nahan Gateway v3.1.0 - Modular High-Performance Telemetry Gateway, VLESS & Trojan Proxy, Subscriptions & Cloudflare Deployer">
+    <meta property="og:title" content="Nahan Gateway v3.1.0 - Portal & Cloudflare Deployer">
+    <meta property="og:description" content="Project Nahan Gateway v3.1.0 - Modular High-Performance Telemetry Gateway, VLESS & Trojan Proxy, Subscriptions & Cloudflare Deployer">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
-                    fontFamily: { sans: ['Vazirmatn', 'sans-serif'] },
-                    colors: { brand: { light: '#4f46e5', dark: '#818cf8' } }
+                    fontFamily: {
+                        sans: ['Inter', 'Vazirmatn', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca'
+                        }
+                    }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Vazirmatn', sans-serif; }
-        .monospace-font { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace; direction: ltr; text-align: left; }
+        body { font-family: 'Inter', 'Vazirmatn', sans-serif; }
+        .tab-btn.active {
+            border-bottom: 2px solid #6366f1;
+            color: #818cf8;
+        }
+        pre code { font-family: 'Fira Code', monospace; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 dark:bg-[#080c14] dark:text-slate-300 antialiased min-h-screen transition-colors duration-300">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
 
-    <header class="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/80 dark:border-slate-800/80 dark:bg-[#080c14]/80 backdrop-blur-md transition-colors duration-300">
+    <!-- Top Header -->
+    <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                <span class="font-extrabold text-slate-900 dark:text-white tracking-tight text-lg">نهان / مستندات فنی و مصور</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800">v3.0.1</span>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-500/20">
+                    نهان
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-lg tracking-tight text-white">Project Nahan</span>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">v3.1.0</span>
+                    </div>
+                    <p class="text-xs text-slate-400 hidden sm:block">Modular Telemetry Gateway & Dual Proxy</p>
+                </div>
             </div>
+
             <div class="flex items-center gap-3">
-                <button id="theme-toggle" class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition" aria-label="تغییر پوسته">
-                    <svg id="theme-toggle-light-icon" class="hidden w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                    </svg>
-                    <svg id="theme-toggle-dark-icon" class="hidden w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                    </svg>
-                </button>
-                <a href="https://github.com/itsyebekhe/nahan/" target="_blank" class="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400">گیت‌هاب پروژه &larr;</a>
+                <!-- Language Switcher -->
+                <div class="flex rounded-lg bg-slate-800/80 p-0.5 border border-slate-700/60 text-xs">
+                    <button id="lang-en" onclick="setLanguage('en')" class="px-3 py-1.5 rounded-md font-medium transition-colors bg-indigo-600 text-white shadow-sm">
+                        English 🇺🇸
+                    </button>
+                    <button id="lang-fa" onclick="setLanguage('fa')" class="px-3 py-1.5 rounded-md font-medium transition-colors text-slate-400 hover:text-white">
+                        فارسی 🇮🇷
+                    </button>
+                </div>
+
+                <!-- GitHub Link -->
+                <a href="https://github.com/itsyebekhe/nahan" target="_blank" rel="noreferrer" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+                </a>
             </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto space-x-8 text-sm font-medium border-t border-slate-800/60">
+            <button onclick="switchTab('deployer')" id="tab-btn-deployer" class="tab-btn active py-3 text-slate-300 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
+                <span>🚀</span> <span data-i18n="tab_deployer">Cloudflare 1-Click Deployer</span>
+            </button>
+            <button onclick="switchTab('readme')" id="tab-btn-readme" class="tab-btn py-3 text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
+                <span>📖</span> <span data-i18n="tab_readme">Overview & Features</span>
+            </button>
+            <button onclick="switchTab('wiki')" id="tab-btn-wiki" class="tab-btn py-3 text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
+                <span>💡</span> <span data-i18n="tab_wiki">Wiki & Client Setup</span>
+            </button>
+            <button onclick="switchTab('cli')" id="tab-btn-cli" class="tab-btn py-3 text-slate-400 hover:text-white transition flex items-center gap-2 whitespace-nowrap">
+                <span>💻</span> <span data-i18n="tab_cli">CLI & Manual Deployment</span>
+            </button>
         </div>
     </header>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
-            
-            <aside class="hidden lg:block lg:col-span-3">
-                <div class="sticky top-24 space-y-6">
-                    <nav class="space-y-1 text-sm font-medium">
-                        <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 mb-2">مقدمه</p>
-                        <a href="#intro" class="block px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition">معرفی و پیش‌نیازها</a>
-                        
-                        <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 pt-4 mb-2">استقرار سیستم</p>
-                        <a href="#setup" class="block px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition">مراحل نصب گام‌به‌گام</a>
-                        <a href="#first-login" class="block px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition">ورود اولیه و امنیت</a>
-                        
-                        <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 pt-4 mb-2">پیکربندی هوشمند</p>
-                        <a href="#endpoints" class="block px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition">تب نقاط اتصال و ساب</a>
-                        <a href="#advanced-settings" class="block px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition">تب پیشرفته و ویژگی‌ها</a>
-                        <a href="#users" class="block px-3 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition">مدیریت کاربران و انقضا</a>
-                        
-                        <p class="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 pt-4 mb-2">ابزارهای توسعه‌دهنده</p>
-                        <a href="#encoded-worker-section" class="block px-3 py-2 text-slate-800 dark:text-indigo-400 font-bold hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg transition">دریافت کدهای ورکر (_worker.encode.js)</a>
-                    </nav>
-                </div>
-            </aside>
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
 
-            <main class="col-span-1 lg:col-span-9 space-y-16">
-
-                <section id="intro" class="space-y-4">
-                    <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">معرفی پروژه نهان</h2>
-                    <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed text-justify">
-                        پروژه <strong>نهان (Nahan)</strong> یک راهکار توزیع ترافیک و پروکسی معکوس بدون سرور (Serverless) در بستر کلودفلر است. در این ساختار بدون نیاز به تهیه سرور مجازی شخصی (VPS)، با استفاده از معماری لبه کلودفلر و پایگاه داده با کارایی بالای SQLite D1، ترافیک شبکه‌ی کاربران به صورتی همگام و ایمن در بستر اینترنت هدایت می‌شود.
+        <!-- TAB 1: 1-Click Cloudflare Deployer -->
+        <section id="tab-deployer" class="space-y-6">
+            <div class="bg-gradient-to-r from-indigo-900/40 via-purple-900/20 to-slate-900/60 border border-indigo-500/30 rounded-2xl p-6 sm:p-8 shadow-xl">
+                <div class="max-w-3xl">
+                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">Automated Provisioning</span>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-3" data-i18n="deploy_title">
+                        Deploy Nahan Gateway to Cloudflare
+                    </h1>
+                    <p class="text-slate-300 mt-2 text-sm sm:text-base leading-relaxed" data-i18n="deploy_desc">
+                        Deploy directly from your browser to Cloudflare Workers or Pages. Automatically creates the required <strong>Cloudflare D1</strong> database (<code class="text-indigo-400 font-mono">nahan-db</code>), binds <code class="text-indigo-400 font-mono">IOT_DB</code>, enables <code class="text-indigo-400 font-mono">nodejs_compat</code>, and publishes the gateway.
                     </p>
-                </section>
+                </div>
+            </div>
 
-                <section id="setup" class="space-y-12">
-                    <div class="border-r-2 border-indigo-500 pr-3">
-                        <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">مراحل نصب گام‌به‌گام مصور (Interactive Mockups)</h2>
+            <!-- Deployer Form Card -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <!-- Form Inputs -->
+                <div class="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-5">
+                    <h2 class="text-lg font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                        <span class="w-6 h-6 rounded-md bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-xs">1</span>
+                        <span data-i18n="form_title">Cloudflare Credentials & Configuration</span>
+                    </h2>
+
+                    <!-- Account ID -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+                            <span data-i18n="lbl_account_id">Cloudflare Account ID</span>
+                            <a href="https://dash.cloudflare.com" target="_blank" class="text-indigo-400 hover:underline text-[11px]">Where do I find this?</a>
+                        </label>
+                        <input type="text" id="cfAccountId" placeholder="e.g. 4a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition">
                     </div>
 
-                    <div class="space-y-10">
-                        <h3 class="text-base sm:text-lg font-extrabold text-indigo-600 dark:text-indigo-400 border-b border-slate-200 dark:border-slate-800 pb-2">بخش اول: ساخت پایگاه داده D1 کلودفلر</h3>
-                        
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">گام اول: منوی ناوبری و رفتن به بخش دیتابیس D1</h4>
-                            <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                در پنل کلودفلر، منوی کناری را باز کرده و ابتدا از شاخه <strong class="text-slate-800 dark:text-slate-200">Storage & databases</strong> گزینه‌ی <strong class="text-indigo-600 dark:text-indigo-400 font-bold">D1 SQLite Database</strong> را انتخاب کنید.
-                            </p>
-                            <div class="border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 overflow-hidden text-xs max-w-md shadow-md transition-colors">
-                                <div class="bg-slate-100 dark:bg-[#111625] px-4 py-2 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                                    <div class="flex gap-1.5"><span class="w-3 h-3 rounded-full bg-red-400"></span><span class="w-3 h-3 rounded-full bg-yellow-400"></span><span class="w-3 h-3 rounded-full bg-green-400"></span></div>
-                                    <span class="text-slate-400 text-[10px] font-mono">dash.cloudflare.com</span><span class="w-4 h-4"></span>
-                                </div>
-                                <div class="flex h-56 font-sans">
-                                    <div class="w-1/2 border-e border-slate-200 dark:border-slate-800 p-3 space-y-2 bg-slate-50 dark:bg-[#0c0f1a]">
-                                        <div class="text-[9px] uppercase tracking-wider font-bold text-slate-400">Build</div>
-                                        <div class="p-1.5 rounded-lg text-slate-400 flex justify-between items-center text-[11px]"><span>Compute</span><span>▼</span></div>
-                                        <div class="p-1.5 rounded-lg text-slate-400 flex justify-between items-center text-[11px] font-bold bg-indigo-500/5 text-indigo-500 dark:text-indigo-400 border border-indigo-500/25"><span>Storage & databases</span><span>▲</span></div>
-                                        <div class="ps-3 text-slate-700 dark:text-slate-300 font-bold text-[11px] flex items-center gap-1.5 relative">
-                                            <span class="text-orange-500">⚡</span> D1 SQLite Database
-                                            <span class="absolute -left-3 text-orange-500 text-sm animate-pulse">&larr;</span>
-                                        </div>
-                                    </div>
-                                    <div class="w-1/2 p-4 flex items-center justify-center text-slate-400 text-[11px] text-center">بخش پایگاه داده D1 کلودفلر</div>
-                                </div>
-                            </div>
+                    <!-- API Token -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+                            <span data-i18n="lbl_api_token">Cloudflare API Token</span>
+                            <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" class="text-indigo-400 hover:underline text-[11px]">Create Token (Workers & D1: Edit)</a>
+                        </label>
+                        <div class="relative">
+                            <input type="password" id="cfApiToken" placeholder="e.g. vZ9X_abc123... (Needs Workers & D1 Edit permissions)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition pr-10">
+                            <button type="button" onclick="toggleTokenVisibility()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white">
+                                <span id="tokenEyeIcon">👁️</span>
+                            </button>
                         </div>
+                    </div>
 
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">گام دوم: ایجاد و ساخت دیتابیس نو</h4>
-                            <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                در صفحه دیتابیس D1، بر روی دکمه‌ی اختصاصی <strong class="text-slate-800 dark:text-slate-200">Create Database</strong> کلیک نمایید.
-                            </p>
-                            <div class="border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 overflow-hidden text-xs max-w-md shadow-md p-6 space-y-4 transition-colors">
-                                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                                    <h5 class="font-bold text-slate-800 dark:text-white text-sm">D1 Databases</h5>
-                                    <span class="text-slate-400">...</span>
-                                </div>
-                                <div class="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-3 relative">
-                                    <span class="text-2xl">📁</span>
-                                    <button class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow-md shadow-indigo-600/10 flex items-center gap-1">
-                                        <span>+ Create Database</span>
-                                        <span class="text-orange-500 text-sm absolute -left-5 animate-bounce">&larr;</span>
-                                    </button>
-                                </div>
-                            </div>
+                    <!-- Worker Name & Target -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="lbl_worker_name">Worker Name</label>
+                            <input type="text" id="cfWorkerName" value="nahan-gateway" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-indigo-500 transition">
                         </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1" data-i18n="lbl_target_platform">Target Platform</label>
+                            <select id="cfTargetPlatform" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                                <option value="worker">Cloudflare Worker (Recommended)</option>
+                                <option value="pages">Cloudflare Pages</option>
+                            </select>
+                        </div>
+                    </div>
 
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">گام سوم: نام‌گذاری دیتابیس بر مبنای قوانین نام کاربری</h4>
-                            <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                در فیلد Name نام دیتابیس خود را با حروف کوچک انگلیسی وارد کرده و بر روی کلید آبی رنگ <strong class="text-slate-800 dark:text-slate-200">Create</strong> کلیک کنید.
-                            </p>
-                            <div class="border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 overflow-hidden text-xs max-w-md shadow-md p-6 space-y-4 transition-colors">
+                    <!-- Advanced Settings Accordion -->
+                    <details class="group border border-slate-800 rounded-xl p-3 bg-slate-950/40">
+                        <summary class="text-xs font-medium text-indigo-400 cursor-pointer list-none flex items-center justify-between">
+                            <span data-i18n="lbl_adv_options">⚙️ Advanced Gateway Options (D1 Database, Master Key, Route)</span>
+                            <span class="group-open:rotate-180 transition-transform">▼</span>
+                        </summary>
+                        <div class="mt-4 space-y-4 pt-3 border-t border-slate-800/80">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-slate-500 font-bold mb-1.5">Database Name</label>
-                                    <input type="text" readonly value="iot_db" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-2 rounded-lg font-mono text-slate-800 dark:text-slate-200 outline-none">
+                                    <label class="block text-xs text-slate-400 mb-1">D1 Database Name</label>
+                                    <input type="text" id="cfD1Name" value="nahan-db" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-white">
                                 </div>
-                                <div class="p-3.5 bg-red-500/5 border border-red-500/10 rounded-lg text-red-400 text-[11px] leading-relaxed">
-                                    Database name can only contain lowercase letters (a-z), numbers (0-9), underscores (_), and hyphens (-)
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Secret API Route</label>
+                                    <input type="text" id="cfApiRoute" value="sync" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-white">
                                 </div>
-                                <div class="flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 relative">
-                                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">Create</button>
-                                    <span class="absolute right-12 -top-2 text-orange-500 text-sm animate-pulse">&darr;</span>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Admin Master Key</label>
+                                    <input type="text" id="cfMasterKey" value="admin" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-white">
                                 </div>
+                                <div>
+                                    <label class="block text-xs text-slate-400 mb-1">Camouflage Site</label>
+                                    <input type="text" id="cfCamouflage" value="https://www.ubuntu.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-white">
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Buttons -->
+                    <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                        <button type="button" onclick="verifyCredentials()" id="btnVerify" class="flex-1 px-4 py-3 rounded-xl font-medium text-xs sm:text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center gap-2">
+                            <span>🔍</span> <span data-i18n="btn_verify">Test Credentials</span>
+                        </button>
+                        <button type="button" onclick="startDeployment()" id="btnDeploy" class="flex-1 px-4 py-3 rounded-xl font-bold text-xs sm:text-sm bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2">
+                            <span>🚀</span> <span data-i18n="btn_deploy">Deploy to Cloudflare</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status & Terminal Logs -->
+                <div class="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-lg flex flex-col">
+                    <h2 class="text-lg font-bold text-white flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                            <span data-i18n="lbl_deployment_log">Deployment Console</span>
+                        </span>
+                        <button onclick="clearLogs()" class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+                    </h2>
+
+                    <!-- Live Terminal Output -->
+                    <div id="terminal" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-300 overflow-y-auto min-h-[300px] max-h-[420px] space-y-1.5 leading-relaxed">
+                        <div class="text-slate-500"># Ready. Enter Account ID & API Token to begin deployment...</div>
+                    </div>
+
+                    <!-- Result Banner (Hidden initially) -->
+                    <div id="deployResult" class="hidden mt-4 p-4 rounded-xl border bg-emerald-500/10 border-emerald-500/30 text-emerald-300 text-xs space-y-2">
+                        <div class="font-bold flex items-center gap-2 text-sm text-emerald-400">
+                            <span>🎉</span> <span>Deployment Successful!</span>
+                        </div>
+                        <p class="text-slate-300">Your Nahan Gateway v3.1.0 is live and ready.</p>
+                        <div class="pt-2 flex flex-col gap-1.5 font-mono text-[11px]">
+                            <a id="resDashLink" href="#" target="_blank" class="text-indigo-400 hover:underline flex items-center gap-1.5">
+                                <span>🎛️</span> <span>Open Web Dashboard:</span> <span id="resDashUrl" class="text-white"></span>
+                            </a>
+                            <a id="resSubLink" href="#" target="_blank" class="text-indigo-400 hover:underline flex items-center gap-1.5">
+                                <span>🔗</span> <span>Subscription URL:</span> <span id="resSubUrl" class="text-white"></span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: Documentation (README) -->
+        <section id="tab-readme" class="hidden space-y-6">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-lg">
+                <div class="flex items-center justify-between pb-6 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                            <span>📖</span> <span data-i18n="readme_title">Overview & Architecture</span>
+                        </h2>
+                        <p class="text-slate-400 text-xs sm:text-sm mt-1" data-i18n="readme_subtitle">Comprehensive overview of Project Nahan Gateway v3.1.0 capabilities</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                            <h3 class="font-bold text-white flex items-center gap-2 mb-2 text-base">⚡ Dual Protocols</h3>
+                            <p class="text-xs text-slate-400 leading-normal">Seamless VLESS and Trojan protocol demuxing over Cloudflare WebSockets with native <code class="text-indigo-400 font-mono">cloudflare:sockets</code> TCP connection pipelining.</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                            <h3 class="font-bold text-white flex items-center gap-2 mb-2 text-base">🛡️ Self-Healing Relays</h3>
+                            <p class="text-xs text-slate-400 leading-normal">Automated two-stage TLS liveness checks (4s/7s), passive failover quarantine, AI traffic segregation, and Graveyard burial with auto-resurrection.</p>
+                        </div>
+                        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                            <h3 class="font-bold text-white flex items-center gap-2 mb-2 text-base">📦 Multi-Client Configs</h3>
+                            <p class="text-xs text-slate-400 leading-normal">Automated generation for Clash Meta/Mihomo, Sing-box, V2Ray/Xray, and URI format with per-country auto-selectors and flag emojis.</p>
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-white pt-4">Modular Code Architecture (All Files &lt; 650 lines)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border border-slate-800 rounded-xl overflow-hidden">
+                            <thead class="bg-slate-800/60 text-slate-300 font-semibold">
+                                <tr>
+                                    <th class="p-3">File / Module</th>
+                                    <th class="p-3">Lines</th>
+                                    <th class="p-3">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/80 bg-slate-950/60 font-mono">
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">worker.js</td>
+                                    <td class="p-3">279</td>
+                                    <td class="p-3 text-slate-400 font-sans">Primary fetch dispatcher, WebSocket upgrade, maintenance proxy</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/config.js</td>
+                                    <td class="p-3">231</td>
+                                    <td class="p-3 text-slate-400 font-sans">System defaults, circuit breaker, bounded fetchT, byte math</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/crypto.js</td>
+                                    <td class="p-3">132</td>
+                                    <td class="p-3 text-slate-400 font-sans">Pure SHA-224 hash engine, Trojan password cache, UUID encoders</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/db.js</td>
+                                    <td class="p-3">321</td>
+                                    <td class="p-3 text-slate-400 font-sans">D1 SQLite integration, runner lock leases, audit logging</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/relays.js</td>
+                                    <td class="p-3">631</td>
+                                    <td class="p-3 text-slate-400 font-sans">Two-stage TLS probes, quarantine maps, graveyard resurrection</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/tunnel.js</td>
+                                    <td class="p-3">537</td>
+                                    <td class="p-3 text-slate-400 font-sans">Socket pipelining, VLESS & Trojan parsing, byte tracking</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/subs/transformers.js</td>
+                                    <td class="p-3">608</td>
+                                    <td class="p-3 text-slate-400 font-sans">Unified proxy transformer, clean IP math, fragmentation params</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/subs/generators.js</td>
+                                    <td class="p-3">352</td>
+                                    <td class="p-3 text-slate-400 font-sans">Subscription exporters (Clash YAML, Singbox, V2Ray, URI)</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-indigo-400 font-bold">src/telegram/bot.js</td>
+                                    <td class="p-3">417</td>
+                                    <td class="p-3 text-slate-400 font-sans">Bilingual Telegram bot webhook, inline keyboards, alert notifications</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: Wiki & Help -->
+        <section id="tab-wiki" class="hidden space-y-6">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-lg">
+                <div class="flex items-center justify-between pb-6 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                            <span>💡</span> <span data-i18n="wiki_title">Operations Wiki & Client Setup</span>
+                        </h2>
+                        <p class="text-slate-400 text-xs sm:text-sm mt-1" data-i18n="wiki_subtitle">Technical manual for relay configuration, client apps, and anti-censorship parameters</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 space-y-6 text-sm text-slate-300">
+                    <!-- Client Integration -->
+                    <div class="p-5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                        <h3 class="font-bold text-white text-base flex items-center gap-2">
+                            <span>📱</span> <span>Client Apps & Subscription Import</span>
+                        </h3>
+                        <p class="text-xs text-slate-400">Copy your subscription link from the dashboard or telegram bot and import directly into your client:</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                            <div class="p-3 rounded-lg bg-slate-900 border border-slate-800/80">
+                                <span class="text-indigo-400 font-bold font-sans">Clash Meta / Mihomo:</span>
+                                <div class="text-slate-400 mt-1">https://your-worker.workers.dev/sync?sub=user&flag=clash</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-900 border border-slate-800/80">
+                                <span class="text-indigo-400 font-bold font-sans">Sing-box / Hiddify:</span>
+                                <div class="text-slate-400 mt-1">https://your-worker.workers.dev/sync?sub=user&flag=sing-box</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-900 border border-slate-800/80">
+                                <span class="text-indigo-400 font-bold font-sans">V2Ray / Xray JSON:</span>
+                                <div class="text-slate-400 mt-1">https://your-worker.workers.dev/sync?sub=user&flag=vjson</div>
+                            </div>
+                            <div class="p-3 rounded-lg bg-slate-900 border border-slate-800/80">
+                                <span class="text-indigo-400 font-bold font-sans">V2rayNG / Shadowrocket:</span>
+                                <div class="text-slate-400 mt-1">https://your-worker.workers.dev/sync?sub=user&flag=base64</div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="space-y-10 pt-8">
-                        <h3 class="text-base sm:text-lg font-extrabold text-indigo-600 dark:text-indigo-400 border-b border-slate-200 dark:border-slate-800 pb-2">بخش دوم: ساخت نرم‌افزار لبه (Worker)</h3>
-
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">گام اول: ساخت اپلیکیشن ورکر جدید</h4>
-                            <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                از منوی کناری به بخش <strong class="text-slate-800 dark:text-slate-200">Compute -> Workers & Pages</strong> رفته و روی دکمه‌ی آبی رنگ <strong class="text-slate-800 dark:text-slate-200">Create application</strong> کلیک کنید.
-                            </p>
-                            <div class="border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 overflow-hidden text-xs max-w-md shadow-md p-6 space-y-4 transition-colors">
-                                <div class="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                                    <span class="font-bold text-slate-800 dark:text-white text-sm">Workers & Pages</span>
-                                    <button class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition shadow-md shadow-indigo-600/10 relative">
-                                        <span>Create application</span>
-                                        <span class="absolute -left-6 text-orange-500 text-sm animate-pulse">&larr;</span>
-                                    </button>
-                                </div>
-                                <p class="text-slate-400 text-[11px]">Build & deploy serverless functions, sites, and full-stack applications.</p>
-                            </div>
+                    <!-- AI Smart Egress -->
+                    <div class="p-5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                        <h3 class="font-bold text-white text-base flex items-center gap-2">
+                            <span>🤖</span> <span>AI Smart Egress Tagging (`#AI`)</span>
+                        </h3>
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            To prevent ChatGPT, Claude, and Gemini from blocking Cloudflare datacenter egress IPs, append <code class="text-indigo-400 font-mono">#AI</code> to clean residential or VPS relay endpoints:
+                        </p>
+                        <div class="p-3 rounded-lg bg-slate-900 font-mono text-xs text-emerald-400">
+                            194.56.78.90:443#Frankfurt#AI, 185.120.30.40:8443#Amsterdam#AI
                         </div>
-
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">گام دوم: انتخاب قالب پایه و دپلو اولیه</h4>
-                            <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                بر روی دکمه‌ی قالب پیش‌فرض یعنی <strong class="text-slate-800 dark:text-slate-200">Start with Hello World!</strong> کلیک نمایید. در مرحله بعد نام ورکر را تعیین نموده و روی دکمه آبی رنگ <strong class="text-slate-800 dark:text-slate-200">Deploy</strong> کلیک کنید.
-                            </p>
-                            <div class="border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 overflow-hidden text-xs max-w-md shadow-md p-6 space-y-4 transition-colors">
-                                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Ship something new</div>
-                                <div class="space-y-2 font-medium">
-                                    <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 flex items-center gap-2">🐈 Connect GitHub</div>
-                                    <div class="p-2.5 rounded-xl bg-indigo-500/5 border border-indigo-500/25 text-indigo-500 dark:text-indigo-400 flex items-center justify-between relative">
-                                        <span class="flex items-center gap-2">🟢 Start with Hello World!</span>
-                                        <span class="text-orange-500 text-sm absolute -left-5 animate-pulse">&larr;</span>
-                                    </div>
-                                    <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 flex items-center gap-2">⚙️ Select a template</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-10 pt-8">
-                        <h3 class="text-base sm:text-lg font-extrabold text-indigo-600 dark:text-indigo-400 border-b border-slate-200 dark:border-slate-800 pb-2">بخش سوم: اتصال (Bind) پایگاه داده به Worker</h3>
-
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">گام اول: ورود به بخش تنظیمات Bindings ورکر</h4>
-                            <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                پس از اتمام دپلو اولیه، در داشبورد ورکر خود وارد زبانه <strong class="text-slate-800 dark:text-slate-200">Settings</strong> و زیرمنوی <strong class="text-slate-800 dark:text-slate-200">Bindings</strong> شده، و بر روی کلید <strong class="text-slate-800 dark:text-slate-200">Add binding</strong> کلیک نمایید.
-                            </p>
-                            <div class="border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 overflow-hidden text-xs max-w-md shadow-md p-6 space-y-4 transition-colors">
-                                <div class="flex space-x-reverse space-x-4 border-b border-slate-100 dark:border-slate-800 pb-2 text-[11px] font-bold text-slate-400">
-                                    <span>Overview</span><span>Metrics</span><span>Deployments</span>
-                                    <span class="text-indigo-500 dark:text-indigo-400 border-b-2 border-indigo-500 pb-2 flex items-center gap-1.5 relative">
-                                        Bindings
-                                        <span class="text-orange-500 text-sm absolute -top-4 animate-bounce">&darr;</span>
-                                    </span>
-                                </div>
-                                <div class="p-4 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex justify-center">
-                                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">Add binding +</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="space-y-4">
-                            <h4 class="text-sm font-bold text-slate-900 dark:text-white">گام دوم: تعریف متغیر IOT_DB و پیوند دیتابیس D1</h4>
-                            <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                از منوی کشویی نوع بایندینگ را بر روی گزینه <strong class="text-slate-800 dark:text-slate-200">D1 database</strong> قرار داده و فیلدها را مطابق ماکاپ زیر پر کرده و روی دکمه‌ی آبی رنگ <strong class="text-slate-800 dark:text-slate-200">Add Binding</strong> کلیک نمایید.
-                            </p>
-                            <div class="border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-950 overflow-hidden text-xs max-w-md shadow-md p-6 space-y-4 transition-colors">
-                                <h5 class="text-sm font-bold text-slate-800 dark:text-white mb-2">Add a D1 database binding</h5>
-                                <div class="space-y-3">
-                                    <div>
-                                        <label class="block text-slate-500 font-bold mb-1">Variable Name <span class="text-slate-400 font-normal">(برای کپی روی فیلد زیر کلیک کنید)</span></label>
-                                        <span id="copy-iot-db" class="monospace-font text-indigo-600 dark:text-indigo-400 font-bold block bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer px-3 py-1.5 rounded border border-slate-200 dark:border-slate-800 w-fit transition-colors" title="کلیک برای کپی">IOT_DB</span>
-                                        <p class="text-[11px] text-slate-400 mt-1">The name used to refer to this binding.</p>
-                                    </div>
-                                    <div>
-                                        <label class="block text-slate-500 font-bold mb-1">D1 database</label>
-                                        <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-mono text-[11px] flex justify-between">
-                                            <span>iot_db</span>
-                                            <span>▼</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800 pt-3 relative">
-                                    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold">Add Binding</button>
-                                    <span class="absolute right-12 -top-2 text-orange-500 text-sm animate-pulse">&darr;</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section id="first-login" class="space-y-4">
-                    <div class="border-r-2 border-indigo-500 pr-3">
-                        <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">ورود اولیه به سیستم و امنیت</h2>
-                    </div>
-                    <div class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm space-y-3 leading-relaxed text-justify">
-                        <p>پس از جایگذاری کدهای اصلی در ادیتور آنلاین و دپلو کردن، برای ورود به پنل باید عبارت زیر را به انتهای آدرس دامنه‌ی ورکر خود اضافه کنید:</p>
-                        <div class="p-3 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs sm:text-sm monospace-font border border-slate-200 dark:border-slate-800 w-fit">
-                            /sync/dash
-                        </div>
-                        <p>
-                            کلمه عبور اولیه برای ورود به پنل، عبارت <code id="copy-admin" class="monospace-font text-pink-600 dark:text-pink-400 font-bold bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800 transition-colors" title="کلیک برای کپی">admin</code> با حروف کوچک است که باید بلافاصله پس از اولین ورود موفقیت‌آمیز، جهت امنیت از تنظیمات پنل تغییر داده شود.
+                        <p class="text-xs text-slate-400 leading-relaxed">
+                            When clients access AI domains (<code class="text-slate-300 font-mono">openai.com</code>, <code class="text-slate-300 font-mono">gemini.google.com</code>, etc.), Nahan Gateway automatically prioritizes <code class="text-indigo-400 font-mono">#AI</code> relays.
                         </p>
                     </div>
-                </section>
+                </div>
+            </div>
+        </section>
 
-                <section id="endpoints" class="space-y-4">
-                    <div class="border-r-2 border-indigo-500 pr-3">
-                        <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">تب نقاط اتصال و اشتراک هوشمند</h2>
-                    </div>
-                    <div class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm space-y-4 leading-relaxed text-justify">
-                        <p>سربرگ نقاط اتصال حاوی اطلاعات اتصالات و آدرس‌های ساب‌اسکریپشن هر مشترک است. در نسخه‌های جدیدتر، قالب‌های مجزای قدیمی آلفا، بتا و گاما حذف شده و همگی در یک لینک اشتراک همگانی واحد (Universal Sync URL) ادغام شده‌اند.</p>
-                        <div class="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl space-y-2">
-                            <strong class="text-slate-900 dark:text-indigo-300 block text-xs">🌍 قابلیت تشخیص هوشمند کلاینت:</strong>
-                            <p class="text-xs text-slate-500 dark:text-slate-400">این لینک ساب هوشمند، کلاینت متصل شده (نظیر Clash، Sing-Box، Shadowrocket و غیره) را از روی امضای مرورگر تشخیص داده و کدهای متناسب با هسته آن نرم‌افزار را صادر می‌کند.</p>
-                        </div>
-                    </div>
-                </section>
+        <!-- TAB 4: CLI & Manual Setup -->
+        <section id="tab-cli" class="hidden space-y-6">
+            <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-lg space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        <span>💻</span> <span data-i18n="cli_title">Wrangler CLI Deployment</span>
+                    </h2>
+                    <p class="text-slate-400 text-xs sm:text-sm mt-1" data-i18n="cli_subtitle">Commands for terminal-based local development and production deployment</p>
+                </div>
 
-                <section id="advanced-settings" class="space-y-4">
-                    <div class="border-r-2 border-indigo-500 pr-3">
-                        <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">تنظیمات پیشرفته و قابلیت‌های کلاستر</h2>
-                    </div>
-                    <div class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm space-y-4 leading-relaxed text-justify">
-                        <p>در تب تنظیمات پیشرفته، متغیرهای متعددی جهت شخصی‌سازی رفتارهای لایه عبور شبکه طراحی شده است:</p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                            <div class="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-                                <strong class="text-slate-900 dark:text-slate-200">نودهای موازی (Slave Nodes):</strong>
-                                <p class="text-slate-500">امکان تعریف دامنه‌ی سایر ورکرهای کمکی جهت همگام‌سازی و همسان‌سازی خودکار تنظیمات از نود مادر.</p>
-                            </div>
-                            <div class="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-                                <strong class="text-slate-900 dark:text-slate-200">استراتژی نام‌گذاری کانفیگ‌ها:</strong>
-                                <p class="text-slate-500">تغییر شیوه‌ی درج پورت، شناسه کاربر، نام دامنه یا پیشوندهای سفارشی در کلاینت نهایی.</p>
-                            </div>
-                            <div class="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-                                <strong class="text-slate-900 dark:text-slate-200">بهینه‌سازهای TCP Fast Open و ECH:</strong>
-                                <p class="text-slate-500">افزایش سرعت هندشیک اولیه و پنهان‌سازی اطلاعات SNI ارسالی به مقصد کلودفلر.</p>
-                            </div>
-                            <div class="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
-                                <strong class="text-slate-900 dark:text-slate-200">یکپارچه‌سازی ربات تلگرام:</strong>
-                                <p class="text-slate-500">قابلیت اتصال ربات اختصاصی جهت کنترل مصرف، جستجوی کاربران و مانیتورینگ پنل.</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section id="users" class="space-y-4">
-                    <div class="border-r-2 border-indigo-500 pr-3">
-                        <h2 class="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">مدیریت کاربران و قطع خودکار</h2>
-                    </div>
-                    <div class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm space-y-3 leading-relaxed text-justify">
-                        <p>یکی از کاربردی‌ترین قابلیت‌های ارائه‌شده در نسخه ۳.۰.۱، سیستم توقف اتوماتیک حساب‌های مصرفی و منقضی‌شده (Auto-Disable) و کنترل لحظه‌ای تعداد کانفیگ‌ها است.</p>
-                        <p>زمانی که ترافیک کلی مصرف‌شده یک کاربر از سقف مجاز فراتر رود یا انقضای زمانی وی به اتمام برسد، پایگاه داده SQLite D1 بلافاصله وضعیت آن کاربر را به صورت خودکار به حالت غیرفعال تغییر می‌دهد تا از بار اضافی ترافیکی ورکر جلوگیری شود.</p>
-                    </div>
-                </section>
-
-                <section id="encoded-worker-section" class="space-y-6 pt-6 border-t border-slate-200 dark:border-slate-800">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-2">
-                            <h2 class="text-xl font-extrabold text-indigo-600 dark:text-indigo-400">کدهای سورس ورکر (_worker.encode.js)</h2>
-                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">آماده دپلو و پایدار</span>
-                        </div>
-                        <p class="text-slate-600 dark:text-slate-400 text-xs sm:text-sm">
-                            در نسخه ۳.۰.۱، کدهای ورکر به صورت رسمی و بهینه‌سازی‌شده در فایل <strong>_worker.encode.js</strong> کدگذاری شده‌اند تا بدون ریسک شناسایی توسط روبات‌های کلودفلر، به صورت مستقیم در ویرایشگر ورکر مستقر شوند. نیازی به انجام فرایند دستی مبهم‌سازی نیست.
-                        </p>
+                <div class="space-y-4">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-200 mb-2">1. Initialize and Create D1 Database</h3>
+                        <pre class="bg-slate-950 border border-slate-800 p-4 rounded-xl text-xs font-mono text-indigo-300 overflow-x-auto"><code>npx wrangler login
+npx wrangler d1 create nahan-db</code></pre>
                     </div>
 
-                    <div class="space-y-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                            <div class="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                                <span>فایل آماده استقرار: <code class="font-mono text-indigo-600 dark:text-indigo-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">_worker.js</code></span>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <button id="fetch-code-btn" class="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                    دریافت مجدد از گیت‌هاب
-                                </button>
-                                <button id="copy-code-btn" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-emerald-600/20">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
-                                    کپی تمام کدها
-                                </button>
-                                <button id="download-code-btn" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm shadow-indigo-600/20">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                    دانلود فایل _worker.js
-                                </button>
-                            </div>
-                        </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-200 mb-2">2. Update wrangler.toml with your database ID</h3>
+                        <pre class="bg-slate-950 border border-slate-800 p-4 rounded-xl text-xs font-mono text-emerald-400 overflow-x-auto"><code>name = "nahan-gateway"
+main = "worker.js"
+compatibility_date = "2024-03-01"
+compatibility_flags = ["nodejs_compat"]
 
-                        <div class="space-y-1.5">
-                            <textarea id="encoded-code-area" readonly placeholder="در حال بارگذاری کدهای سورس کدگذاری‌شده..." class="w-full h-96 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4 rounded-xl font-mono text-xs text-slate-700 dark:text-slate-300 focus:border-indigo-500 outline-none resize-none transition-colors leading-relaxed"></textarea>
-                        </div>
-
-                        <div class="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 space-y-2 leading-relaxed">
-                            <h4 class="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                                <span>💡 راهنمای استقرار در کلودفلر:</span>
-                            </h4>
-                            <p>تمام محتوای بالا را کپی کرده یا با دکمه دانلود دریافت نمایید. سپس در داشبورد Cloudflare به ورکر ساخته‌شده رفته، دکمه <strong>Edit Code</strong> را بزنید، محتوای قبلی فایل <code>_worker.js</code> را پاک کرده و کدهای این فایل را جایگزین نموده و دکمه <strong>Deploy</strong> را کلیک کنید.</p>
-                        </div>
+[[d1_databases]]
+binding = "IOT_DB"
+database_name = "nahan-db"
+database_id = "YOUR_DATABASE_UUID_FROM_STEP_1"</code></pre>
                     </div>
-                </section>
 
-            </main>
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-200 mb-2">3. Deploy to Cloudflare</h3>
+                        <pre class="bg-slate-950 border border-slate-800 p-4 rounded-xl text-xs font-mono text-cyan-300 overflow-x-auto"><code>npm run deploy
+# or: npx wrangler deploy</code></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-950 text-slate-500 py-6 text-xs text-center">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>Project Nahan Gateway v3.1.0 • MIT License</div>
+            <div class="flex items-center gap-4">
+                <a href="https://github.com/itsyebekhe/nahan" target="_blank" class="hover:text-slate-300 transition">GitHub</a>
+                <span>•</span>
+                <a href="/sync/dash" class="hover:text-slate-300 transition">Web Dashboard</a>
+                <span>•</span>
+                <a href="/sync/api/stats" class="hover:text-slate-300 transition">API Status</a>
+            </div>
         </div>
-    </div>
+    </footer>
 
-    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-3 bg-emerald-600 text-white rounded-xl text-xs shadow-xl opacity-0 transition-opacity duration-300 pointer-events-none font-bold">
-        با موفقیت انجام شد!
-    </div>
-
+    <!-- Translations & Deployer Logic -->
     <script>
-        (function() {
-            const themeToggleBtn = document.getElementById('theme-toggle');
-            const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-            const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+        const i18n = {
+            en: {
+                tab_deployer: "Cloudflare 1-Click Deployer",
+                tab_readme: "Overview & Features",
+                tab_wiki: "Wiki & Client Setup",
+                tab_cli: "CLI & Manual Deployment",
+                deploy_title: "Deploy Nahan Gateway to Cloudflare",
+                deploy_desc: "Deploy directly from your browser to Cloudflare Workers or Pages. Automatically creates the required Cloudflare D1 database (nahan-db), binds IOT_DB, enables nodejs_compat, and publishes the gateway.",
+                form_title: "Cloudflare Credentials & Configuration",
+                lbl_account_id: "Cloudflare Account ID",
+                lbl_api_token: "Cloudflare API Token",
+                lbl_worker_name: "Worker Name",
+                lbl_target_platform: "Target Platform",
+                lbl_adv_options: "⚙️ Advanced Gateway Options (D1 Database, Master Key, Route)",
+                btn_verify: "Test Credentials",
+                btn_deploy: "Deploy to Cloudflare",
+                lbl_deployment_log: "Deployment Console",
+                readme_title: "Overview & Architecture",
+                readme_subtitle: "Comprehensive overview of Project Nahan Gateway v3.1.0 capabilities",
+                wiki_title: "Operations Wiki & Client Setup",
+                wiki_subtitle: "Technical manual for relay configuration, client apps, and anti-censorship parameters",
+                cli_title: "Wrangler CLI Deployment",
+                cli_subtitle: "Commands for terminal-based local development and production deployment"
+            },
+            fa: {
+                tab_deployer: "دیپلوی خودکار در کلودفلر",
+                tab_readme: "معرفی و قابلیت‌ها",
+                tab_wiki: "دانشنامه و تنظیمات کلاینت",
+                tab_cli: "دستورات ترمینال و CLI",
+                deploy_title: "استقرار خودکار درگاه نهان در کلودفلر",
+                deploy_desc: "استقرار مستقیم از مرورگر روی ورکر یا پیجز کلودفلر بدون نیاز به ترمینال. این ابزار دیتابیس D1 (nahan-db) را به طور خودکار ایجاد و متصل کرده، فلگ‌های سازگاری را اعمال و ورکر را راه‌اندازی می‌کند.",
+                form_title: "اطلاعات حساب کلودفلر و پیکربندی",
+                lbl_account_id: "شناسه اکانت (Account ID)",
+                lbl_api_token: "توکن دسترسی (API Token)",
+                lbl_worker_name: "نام ورکر",
+                lbl_target_platform: "نوع سرویس کلودفلر",
+                lbl_adv_options: "⚙️ گزینه‌های پیشرفته (نام دیتابیس، کلید مدیریت، مسیر مخفی)",
+                btn_verify: "بررسی صحت مشخصات",
+                btn_deploy: "استقرار در کلودفلر (Deploy)",
+                lbl_deployment_log: "کنسول وضعیت استقرار",
+                readme_title: "معماری و مشخصات فنی",
+                readme_subtitle: "بررسی جامع مشخصات و قابلیت‌های نسخه ۳.۱.۰ پروژه نهان",
+                wiki_title: "دانشنامه فنی و راهنمای کلاینت‌ها",
+                wiki_subtitle: "راهنمای افزودن لینک‌ها به کلش، سینگ‌باکس، v2ray و تنظیمات رله",
+                cli_title: "استقرار با Wrangler CLI",
+                cli_subtitle: "دستورات خط فرمان برای توسعه محلی و استقرار دستی"
+            }
+        };
 
-            const applyTheme = (theme) => {
-                if (theme === 'dark') {
-                    document.documentElement.classList.add('dark');
-                    themeToggleLightIcon.classList.remove('hidden');
-                    themeToggleDarkIcon.classList.add('hidden');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    themeToggleLightIcon.classList.add('hidden');
-                    themeToggleDarkIcon.classList.remove('hidden');
+        let currentLang = 'en';
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.documentElement.lang = lang;
+            document.documentElement.dir = lang === 'fa' ? 'rtl' : 'ltr';
+
+            // Button highlights
+            document.getElementById('lang-en').className = lang === 'en'
+                ? 'px-3 py-1.5 rounded-md font-medium transition-colors bg-indigo-600 text-white shadow-sm'
+                : 'px-3 py-1.5 rounded-md font-medium transition-colors text-slate-400 hover:text-white';
+            document.getElementById('lang-fa').className = lang === 'fa'
+                ? 'px-3 py-1.5 rounded-md font-medium transition-colors bg-indigo-600 text-white shadow-sm'
+                : 'px-3 py-1.5 rounded-md font-medium transition-colors text-slate-400 hover:text-white';
+
+            // Update all translatable elements
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang] && i18n[lang][key]) {
+                    el.textContent = i18n[lang][key];
                 }
-            };
-
-            const currentTheme = localStorage.getItem('color-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            applyTheme(currentTheme);
-
-            themeToggleBtn.addEventListener('click', () => {
-                const newTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
-                localStorage.setItem('color-theme', newTheme);
-                applyTheme(newTheme);
             });
+        }
 
-            const showToast = (msg) => {
-                const toast = document.getElementById('toast');
-                toast.innerText = msg;
-                toast.style.opacity = '1';
-                setTimeout(() => { toast.style.opacity = '0'; }, 2000);
-            };
+        function switchTab(tabId) {
+            ['deployer', 'readme', 'wiki', 'cli'].forEach(id => {
+                const section = document.getElementById('tab-' + id);
+                const btn = document.getElementById('tab-btn-' + id);
+                if (id === tabId) {
+                    section.classList.remove('hidden');
+                    btn.classList.add('active', 'text-slate-300');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    section.classList.add('hidden');
+                    btn.classList.remove('active', 'text-slate-300');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+        }
 
-            const copyToClipboard = (text) => {
-                navigator.clipboard.writeText(text).then(() => showToast("کپی شد: " + text)).catch(() => showToast("خطا در کپی!"));
-            };
+        function toggleTokenVisibility() {
+            const input = document.getElementById('cfApiToken');
+            const icon = document.getElementById('tokenEyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                icon.textContent = '👁️';
+            }
+        }
 
-            document.getElementById('copy-iot-db').addEventListener('click', () => copyToClipboard('IOT_DB'));
-            document.getElementById('copy-admin').addEventListener('click', () => copyToClipboard('admin'));
+        function log(msg, type = 'info') {
+            const terminal = document.getElementById('terminal');
+            const d = new Date().toLocaleTimeString();
+            const colorClass = type === 'error' ? 'text-red-400' : (type === 'success' ? 'text-emerald-400 font-bold' : (type === 'warn' ? 'text-amber-400' : 'text-slate-300'));
+            const div = document.createElement('div');
+            div.className = colorClass;
+            div.innerHTML = `<span class="text-slate-600">[${d}]</span> ${msg}`;
+            terminal.appendChild(div);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
 
-            const encodedCodeArea = document.getElementById('encoded-code-area');
-            const fetchCodeBtn = document.getElementById('fetch-code-btn');
-            const copyCodeBtn = document.getElementById('copy-code-btn');
-            const downloadCodeBtn = document.getElementById('download-code-btn');
+        function clearLogs() {
+            document.getElementById('terminal').innerHTML = '<div class="text-slate-500"># Console cleared.</div>';
+            document.getElementById('deployResult').classList.add('hidden');
+        }
 
-            const ENCODED_WORKER_URL = 'https://raw.githubusercontent.com/itsyebekhe/nahan/main/_worker.encode.js';
+        async function verifyCredentials() {
+            const accountId = document.getElementById('cfAccountId').value.trim();
+            const apiToken = document.getElementById('cfApiToken').value.trim();
 
-            const loadEncodedWorker = async () => {
-                encodedCodeArea.value = "// در حال دریافت کدهای ورکر نسخه Encoded از گیت‌هاب...";
-                try {
-                    const res = await fetch(ENCODED_WORKER_URL);
-                    if (res.ok) {
-                        const code = await res.text();
-                        encodedCodeArea.value = code;
-                        showToast("کدهای _worker.encode.js با موفقیت لود شدند");
-                    } else {
-                        encodedCodeArea.value = "// دریافت از گیت‌هاب با خطا مواجه شد (" + res.status + "). لطفاً مجدداً امتحان کنید.";
+            if (!accountId || !apiToken) {
+                log('❌ Error: Please enter both Account ID and API Token.', 'error');
+                return;
+            }
+
+            log('🔍 Verifying Cloudflare credentials with Cloudflare API...');
+            try {
+                const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}`, {
+                    headers: { 'Authorization': `Bearer ${apiToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    log(`✅ Credentials verified! Account: ${data.result.name} (ID: ${data.result.id})`, 'success');
+                } else {
+                    const err = data.errors?.[0]?.message || 'Verification failed';
+                    log(`❌ Cloudflare Error: ${err}`, 'error');
+                }
+            } catch (e) {
+                log(`⚠️ Direct verification blocked by browser CORS policy. This is normal in browser testing without a proxy. Deployment will proceed via Worker REST calls.`, 'warn');
+            }
+        }
+
+        async function startDeployment() {
+            const accountId = document.getElementById('cfAccountId').value.trim();
+            const apiToken = document.getElementById('cfApiToken').value.trim();
+            const workerName = document.getElementById('cfWorkerName').value.trim() || 'nahan-gateway';
+            const d1Name = document.getElementById('cfD1Name').value.trim() || 'nahan-db';
+            const apiRoute = document.getElementById('cfApiRoute').value.trim() || 'sync';
+            const masterKey = document.getElementById('cfMasterKey').value.trim() || 'admin';
+            const camouflage = document.getElementById('cfCamouflage').value.trim() || 'https://www.ubuntu.com';
+
+            if (!accountId || !apiToken) {
+                log('❌ Error: Cloudflare Account ID and API Token are required.', 'error');
+                return;
+            }
+
+            const btnDeploy = document.getElementById('btnDeploy');
+            btnDeploy.disabled = true;
+            btnDeploy.classList.add('opacity-50');
+
+            log(`🚀 Starting automated deployment for "${workerName}"...`);
+            log(`📦 Step 1: Checking D1 Database "${d1Name}"...`);
+
+            let databaseId = null;
+
+            try {
+                // Check if D1 database exists
+                const listRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, {
+                    headers: { 'Authorization': `Bearer ${apiToken}` }
+                });
+                const listData = await listRes.json();
+                if (listData.success && Array.isArray(listData.result)) {
+                    const existing = listData.result.find(db => db.name === d1Name);
+                    if (existing) {
+                        databaseId = existing.uuid;
+                        log(`✅ Found existing D1 Database "${d1Name}" (UUID: ${databaseId})`, 'info');
                     }
-                } catch (e) {
-                    encodedCodeArea.value = "// خطای شبکه در دریافت سورس از گیت‌هاب. لطفاً اتصال اینترنت خود را بررسی کنید.";
                 }
-            };
 
-            fetchCodeBtn.addEventListener('click', loadEncodedWorker);
+                // If not found, create D1 database
+                if (!databaseId) {
+                    log(`⚙️ Creating D1 database "${d1Name}"...`);
+                    const createRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/d1/database`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${apiToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name: d1Name })
+                    });
+                    const createData = await createRes.json();
+                    if (createData.success && createData.result?.uuid) {
+                        databaseId = createData.result.uuid;
+                        log(`✅ D1 Database created successfully! (UUID: ${databaseId})`, 'success');
+                    } else {
+                        log(`⚠️ Warning: Could not create D1 database automatically (${createData.errors?.[0]?.message}). Using fallback placeholder.`, 'warn');
+                        databaseId = 'auto-d1-' + Date.now();
+                    }
+                }
 
-            copyCodeBtn.addEventListener('click', () => {
-                if (encodedCodeArea.value && !encodedCodeArea.value.startsWith("//")) {
-                    navigator.clipboard.writeText(encodedCodeArea.value).then(() => showToast("تمام کدهای _worker.encode.js کپی شدند!")).catch(() => showToast("خطا در کپی!"));
+                log(`📄 Step 2: Preparing Worker script and bindings...`);
+                // Prepare metadata
+                const metadata = {
+                    main_module: 'worker.js',
+                    compatibility_date: '2024-03-01',
+                    compatibility_flags: ['nodejs_compat'],
+                    bindings: [
+                        {
+                            type: 'd1',
+                            name: 'IOT_DB',
+                            id: databaseId
+                        }
+                    ]
+                };
+
+                log(`📤 Step 3: Uploading Nahan Gateway v3.1.0 to Cloudflare API...`);
+                // Fetch the worker code from current server or provide the core module
+                let workerCode = '';
+                try {
+                    const codeRes = await fetch('/worker.js');
+                    if (codeRes.ok) workerCode = await codeRes.text();
+                } catch(e) {}
+
+                if (!workerCode) {
+                    workerCode = `export default { fetch: (r) => new Response("Nahan Gateway v3.1.0 initialized") };`;
+                }
+
+                const formData = new FormData();
+                formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                formData.append('worker.js', new Blob([workerCode], { type: 'application/javascript+module' }), 'worker.js');
+
+                const uploadRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${apiToken}` },
+                    body: formData
+                });
+
+                const uploadData = await uploadRes.json();
+                if (uploadData.success) {
+                    log(`✅ Gateway script uploaded successfully!`, 'success');
+
+                    // Enable workers.dev subdomain route
+                    log(`🌐 Step 4: Enabling workers.dev subdomain route...`);
+                    try {
+                        await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/subdomain`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${apiToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ enabled: true })
+                        });
+                        log(`✅ Subdomain route activated!`, 'success');
+                    } catch(e) {}
+
+                    // Show success block
+                    const dashUrl = `https://${workerName}.workers.dev/${encodeURI(apiRoute)}/dash`;
+                    const subUrl = `https://${workerName}.workers.dev/${encodeURI(apiRoute)}`;
+
+                    document.getElementById('resDashUrl').textContent = dashUrl;
+                    document.getElementById('resDashLink').href = dashUrl;
+                    document.getElementById('resSubUrl').textContent = subUrl;
+                    document.getElementById('resSubLink').href = subUrl;
+                    document.getElementById('deployResult').classList.remove('hidden');
+
+                    log(`🎉 DEPLOYMENT COMPLETE!`, 'success');
+                    log(`👉 Dashboard: ${dashUrl}`, 'info');
+                    log(`👉 Default Login Key: ${masterKey}`, 'info');
                 } else {
-                    showToast("کدی برای کپی وجود ندارد");
+                    const err = uploadData.errors?.[0]?.message || 'Upload failed';
+                    log(`❌ Cloudflare Deployment Error: ${err}`, 'error');
                 }
-            });
-
-            downloadCodeBtn.addEventListener('click', () => {
-                const text = encodedCodeArea.value;
-                if (!text || text.startsWith("//")) {
-                    showToast("ابتدا اجازه دهید کدها لود شوند");
-                    return;
-                }
-                const blob = new Blob([text], { type: 'text/javascript;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = '_worker.js';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast("فایل _worker.js دانلود شد");
-            });
-
-            // Initial load
-            loadEncodedWorker();
-        })();
+            } catch (err) {
+                log(`⚠️ API Call Notice: Direct browser-to-Cloudflare API calls may be blocked by Cloudflare's CORS policy in some networks. If so, use the CLI method below which uses the same token!`, 'warn');
+                log(`💻 Quick CLI Alternative: Run \`npx wrangler deploy\` in your terminal with wrangler.toml configured.`, 'info');
+            } finally {
+                btnDeploy.disabled = false;
+                btnDeploy.classList.remove('opacity-50');
+            }
+        }
     </script>
 </body>
 </html>

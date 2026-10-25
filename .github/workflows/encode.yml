@@ -1,48 +1,123 @@
-name: Encode Worker
+name: Encode & Obfuscate Worker
 
 on:
   push:
     branches:
       - main
+      - master
     paths:
-      - '_worker.js'
-      - 'worker_converter.py'
+      - 'worker.js'
+      - 'src/**'
+      - 'worker_convertor.py'
+      - 'package.json'
       - '.github/workflows/encode.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'worker.js'
+      - 'src/**'
+      - 'worker_convertor.py'
+      - 'package.json'
   workflow_dispatch:
+    inputs:
+      bundle_single_file:
+        description: 'Bundle all modules into a single standalone worker.encoded.js'
+        required: true
+        type: boolean
+        default: true
+      encode_all_modules:
+        description: 'Encode all modular files into dist_encoded directory'
+        required: true
+        type: boolean
+        default: true
+      commit_changes:
+        description: 'Commit and push encoded files back to repository'
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
 jobs:
-  encode:
+  build-and-encode:
+    name: Build, Bundle & Encode
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          fetch-depth: 0
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
+          cache: 'npm'
 
-      - name: Encode Worker
-        run: |
-          python worker_converter.py encode -i _worker.js -o _worker.encode.js
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Commit and push encoded worker
+      - name: Install dependencies
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git add _worker.encode.js
-          if git diff --staged --quiet; then
-            echo "No changes in encoded worker."
+          if [ -f package-lock.json ]; then
+            npm ci
           else
-            git commit -m "Auto encode _worker.js via worker_converter [skip ci]"
+            npm install
+          fi
+
+      - name: Validate source code syntax
+        run: npm run build
+
+      - name: Encode Worker (Standalone Bundle)
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.bundle_single_file }}
+        run: |
+          echo "Bundling modular worker and encoding into worker.encoded.js..."
+          python3 worker_convertor.py encode --bundle -o worker.encoded.js
+
+      - name: Encode All Modules (Modular Architecture)
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.encode_all_modules }}
+        run: |
+          echo "Encoding all modular files into dist_encoded/..."
+          python3 worker_convertor.py encode --all -o dist_encoded
+
+      - name: Verify encoded worker syntax
+        run: |
+          if [ -f worker.encoded.js ]; then
+            echo "Verifying syntax of worker.encoded.js..."
+            node --check worker.encoded.js
+            echo "worker.encoded.js syntax verified successfully!"
+          fi
+
+      - name: Upload Encoded Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: encoded-worker
+          path: |
+            worker.encoded.js
+            dist_encoded/
+          if-no-files-found: warn
+
+      - name: Commit and push changes
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.commit_changes) }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add worker.encoded.js
+          if [ -d dist_encoded ]; then
+            git add dist_encoded
+          fi
+          
+          if git diff --staged --quiet; then
+            echo "No changes in encoded files to commit."
+          else
+            git commit -m "chore(build): update encoded worker [skip ci]"
             git push
+            echo "Encoded files pushed to repository."
           fi

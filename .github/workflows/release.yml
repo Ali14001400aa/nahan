@@ -1,0 +1,197 @@
+name: Build Executables & Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Release Version Tag (e.g., v3.1.0)'
+        required: false
+        default: 'v3.1.0'
+      is_draft:
+        description: 'Create as Draft Release'
+        required: true
+        type: boolean
+        default: false
+      is_prerelease:
+        description: 'Mark as Pre-release'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-binaries:
+    name: Build Executable on ${{ matrix.os_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os_name: Windows x64
+            artifact_name: nahan-deployer-windows-x64.exe
+            binary_src: dist/nahan-deployer.exe
+          - os: ubuntu-latest
+            os_name: Linux x64
+            artifact_name: nahan-deployer-linux-x64
+            binary_src: dist/nahan-deployer
+          - os: macos-latest
+            os_name: macOS Universal
+            artifact_name: nahan-deployer-macos
+            binary_src: dist/nahan-deployer
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: Build Standalone Executable
+        run: |
+          pyinstaller --onefile --clean --name nahan-deployer deploy.py
+
+      - name: Rename Executable for Release
+        shell: bash
+        run: |
+          mkdir -p release_assets
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp dist/nahan-deployer.exe release_assets/${{ matrix.artifact_name }}
+          else
+            cp dist/nahan-deployer release_assets/${{ matrix.artifact_name }}
+            chmod +x release_assets/${{ matrix.artifact_name }}
+          fi
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: release_assets/${{ matrix.artifact_name }}
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Determine Version Tag
+        id: get_version
+        run: |
+          if [ -n "${{ github.event.inputs.version_tag }}" ]; then
+            TAG="${{ github.event.inputs.version_tag }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            # Extract version from package.json
+            PKG_VER=$(node -p "require('./package.json').version" 2>/dev/null || echo "3.1.0")
+            TAG="v${PKG_VER}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Download Built Executables
+        uses: actions/download-artifact@v4
+        with:
+          path: release_binaries
+          merge-multiple: true
+
+      - name: Generate Checksums & Release Notes
+        id: release_notes
+        run: |
+          cd release_binaries
+          
+          # Generate SHA-256 Checksums
+          echo "Generating SHA256 checksums..."
+          sha256sum * > SHA256SUMS.txt || shasum -a 256 * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+
+          # Assemble release body markdown
+          cat << 'EOF' > RELEASE_BODY.md
+          ## 🚀 Nahan Gateway Release ${{ steps.get_version.outputs.tag }}
+
+          High-Performance Telemetry Gateway, VLESS & Trojan Proxy, Subscriptions Engine, and 1-Click Cloudflare Deployer.
+
+          ---
+
+          ### 📦 Standalone Deployer Executables
+          The 1-Click Deployer (`deploy.py`) is pre-compiled into standalone binaries. No Python or manual dependency setup required on client machines:
+
+          | Platform | Executable File | Description |
+          |---|---|---|
+          | **Windows (x64)** | [`nahan-deployer-windows-x64.exe`](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag }}/nahan-deployer-windows-x64.exe) | Portable Windows executable (`.exe`) |
+          | **Linux (x64)** | [`nahan-deployer-linux-x64`](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag }}/nahan-deployer-linux-x64) | Standalone Linux binary |
+          | **macOS (Universal)** | [`nahan-deployer-macos`](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag }}/nahan-deployer-macos) | Standalone macOS binary |
+
+          ---
+
+          ### ✨ What's New in v${{ steps.get_version.outputs.version }}
+          - **1-Click Windows Executable (`nahan-deployer.exe`)**:
+            - Auto-detects Node.js and npm
+            - Installs and configures Cloudflare Wrangler CLI
+            - Interactive or headless Cloudflare authentication (API Token, Account ID, or OAuth)
+            - Automated D1 database (`nahan-db`) creation, discovery, and binding (`IOT_DB`)
+            - Choice between **Worker** and **Pages** deployments
+            - Choice between **Normal** (modular clean code) and **Encoded** (encrypted obfuscated bundle)
+          - **Modular Architecture Refactoring**:
+            - All modules structured under `src/` strictly under 1,000 lines
+            - Unified proxy routing for VLESS and Trojan over WebSocket
+            - Template-driven subscription generation (Clash, Sing-Box, V2Ray/Xray, JSON)
+            - Multi-language Telegram bot module (`src/telegram.js` & `src/i18n.js`)
+          - **In-Browser Interactive Deployment Portal (`index.html`)**:
+            - Real-time Cloudflare API integration for browser-based 1-click deployment
+            - Automated D1 database provisioning and SQL schema initialization directly from web UI
+            - Integrated bilingual documentation viewer (English & Persian)
+          - **Worker Encryption & Obfuscation (`worker_convertor.py`)**:
+            - `--bundle` option to compress the modular codebase into a single obfuscated payload
+            - GitHub Actions workflows for continuous build, encoding, and deployment
+
+          ---
+
+          ### ⚡ How to Use the Windows `.exe`
+          1. Download [`nahan-deployer-windows-x64.exe`](https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.tag }}/nahan-deployer-windows-x64.exe).
+          2. Double-click to launch or run in Command Prompt / PowerShell:
+             ```powershell
+             .\nahan-deployer-windows-x64.exe
+             ```
+          3. Follow the interactive prompts to enter your Cloudflare API token or log in via browser.
+          4. The tool automatically provisions your D1 database and deploys the gateway!
+
+          ---
+
+          ### 🔐 SHA-256 Verification Checksums
+          ```text
+          EOF
+          cat release_binaries/SHA256SUMS.txt >> RELEASE_BODY.md
+          cat << 'EOF' >> RELEASE_BODY.md
+          ```
+          EOF
+
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: Nahan Gateway ${{ steps.get_version.outputs.tag }} - 1-Click Deployer & Gateway
+          body_path: RELEASE_BODY.md
+          draft: ${{ github.event.inputs.is_draft || false }}
+          prerelease: ${{ github.event.inputs.is_prerelease || false }}
+          files: |
+            release_binaries/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

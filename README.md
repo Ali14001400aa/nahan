@@ -1,254 +1,222 @@
-# Project Nahan (پروژه نهان)
+# Project Nahan (نهان) Gateway `v3.1.0`
 
-### The Ultimate Serverless Gateway on Cloudflare Workers
+> High-Performance, Modular Telemetry Gateway, Dual VLESS & Trojan Proxy, Multi-Client Subscription Engine, and Self-Healing Relay Mesh for Cloudflare Workers & Pages.
 
-**Nahan** (Persian for *Hidden/Concealed*) is a secure, lightweight, and highly customizable reverse proxy that runs entirely on the edge. It transforms your Cloudflare Worker into a powerful, obfuscated gateway using **VLESS** or **Trojan** protocols, managed via a beautiful, self-contained Web UI.
-
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-F38020?style=for-the-badge&logo=Cloudflare&logoColor=white)](https://workers.cloudflare.com/)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](./LICENSE)
-[![JavaScript](https://img.shields.io/badge/JavaScript-100%25-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://github.com/itsyebekhe/nahan/blob/main/_worker.js)
-
-> 🇮🇷 [نسخه فارسی / Persian Version](./README_FA.md)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/itsyebekhe/nahan)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
 
 ---
 
-## 📖 Table of Contents
+## 🌟 Key Features
 
-- [Why Nahan?](#-why-nahan)
-- [Key Features](#-key-features)
-- [Prerequisites](#-prerequisites)
-- [Quick Install Options](#-quick-install-options)
-- [Step-by-Step Deployment Guide](#-step-by-step-deployment-guide)
-- [Dashboard Guide](#-dashboard-guide)
-- [Advanced Configuration](#-advanced-configuration)
-- [Useful Resources](#-useful-resources)
-- [Applying Configuration Changes](#-applying-configuration-changes)
-- [FAQ & Troubleshooting](#-faq--troubleshooting)
-- [Contributing](#-contributing)
-- [License](#-license)
-
----
-
-## 🌟 Why Nahan?
-
-Nahan isn't just a proxy script — it's a complete management solution designed for **stealth**, **speed**, and **ease of use**.
-
-- 🛡️ **Hidden in Plain Sight:** Unauthorized access attempts are proxied to legitimate sites (e.g., `ubuntu.com` or `docker.com`), making your gateway look like a regular website to network scanners.
-- ⚡ **Zero Server Cost:** Runs entirely on Cloudflare's free plan. No VPS, no server maintenance.
-- 🎨 **Modern Dashboard:** A fully embedded, mobile-friendly dashboard with Dark/Light modes and dual-language support (English / فارسی).
-- 🤖 **Telegram Bot Integration:** Manage your gateway, check usage, and receive login alerts directly via Telegram.
-- 📡 **Multi-User & Multi-IP:** Generate dedicated subscription links for different users and automatically combine them with clean IP lists.
-- 💾 **D1 SQLite Storage:** Configuration persists in Cloudflare D1 database, eliminating KV write limitations.
+- **⚡ Dual Protocol Support**: Full VLESS and Trojan protocol demuxing over Cloudflare WebSockets (`cloudflare:sockets`) with early-data handling.
+- **🛡️ Self-Healing Relay Mesh**:
+  - Passive fail-streak quarantine (15-minute cool-off after 5 consecutive failures).
+  - Active background TLS liveness probes with two-stage verdicts (4s fast check, 7s deep check).
+  - Automated Graveyard burial with slow re-probing (30 minutes) and 3-strike resurrection.
+  - Per-SNI AI quarantine: Preserves relays for standard traffic while routing AI traffic (Gemini, ChatGPT, Claude) through clean endpoints.
+- **📦 Multi-Client Subscription Generator**:
+  - Automatically exports configurations for **Clash Meta / Mihomo** (YAML & JSON), **Sing-box** (JSON), **V2Ray / Xray** (JSON), and standard **URI / Base64**.
+  - Auto-generated per-country routing groups with national emoji flags and latency-based auto-selectors.
+  - Support for Anti-Filtering TCP fragmentation, TLS cipher masks, and ECH (Encrypted Client Hello).
+- **👥 Multi-User Quota & Accounting**:
+  - Exact bidirectional byte accounting (upload + download) per tunnel.
+  - Granular bandwidth limits (Total GB & Daily GB) and expiration dates with automatic disabling.
+- **🤖 Bilingual Telegram Bot**:
+  - Full management webhook with interactive inline menus in English and Persian (فارسی).
+  - Manage subscribers, extend traffic quotas, inspect real-time connection counters, and trigger panic key rotations.
+- **🎛️ Interactive Web Dashboard & Web Deployer**:
+  - Built-in web dashboard for user management and real-time network topology inspection.
+  - Browser-based 1-click deployer (`index.html`) using Cloudflare REST APIs with automated D1 database creation.
+- **🧩 100% Modular ES Architecture**:
+  - Refactored from an 11,000+ line monolith into focused, single-responsibility ES modules with all files strictly under 650 lines and the entry point under 300 lines.
 
 ---
 
-## ✨ Key Features
-
-| Feature | Description |
-|---|---|
-| 🔐 **Dual Protocol** | Switch instantly between **VLESS** (Alpha), **Trojan** (Beta), or **Both** simultaneously |
-| 📱 **QR Code Generation** | Modal-based QR codes for instant mobile client configuration |
-| 👥 **Multi-User Profiles** | Create separate profiles with unique subscription links, per-user nodes, and per-user NAT64 |
-| 🌍 **Clean IP Multiplexer** | Input a list of clean Cloudflare IPs — Nahan auto-generates configs for all of them |
-| 🌐 **NAT64 Support** | Automatic IPv4-to-NAT64-mapped IPv6 conversion with multiple prefix support |
-| ⚙️ **Real-Time Metrics** | View Origin IP, Edge Node location, and run browser-side latency diagnostics |
-| 💾 **D1 SQLite Storage** | All configuration persists in Cloudflare D1 even after code updates |
-| 🚨 **Kill Switch** | Immediately pause all proxy traffic with one click from the dashboard or Telegram |
-| 📊 **Bandwidth Management** | Track per-user upload/download with TB/GB limits and pause/resume controls |
-| 📋 **Activity Logs** | Full history of login attempts and configuration changes |
-| 🔒 **ECH Support** | Toggle Encrypted Client Hello (ECH) parameters in generated client configs |
-| 📦 **Backup & Restore** | Export/import your full configuration as a `.json` file |
-| 🔄 **Auto Update** | Automatic deployment of new versions from GitHub with format and obfuscation options |
-| 🎭 **Configurable Fake Configs** | Customizable fake subscription entries with `{usage}` and `{expiry}` template variables |
-| 🖥️ **Per-User Nodes** | Define custom hostnames per subscriber for multi-region deployments |
-| 🏷️ **Rich Name Strategy** | Config naming with `{FLAG}`, `{COUNTRY}`, `{CITY}`, `{ISP}`, `{HOST}`, `{DATE}`, `{WORKER}` tags |
-| 🌐 **Bilingual Subscription Page** | Subscription info page with full **Persian/Farsi** and **English** support, RTL layout, and dark/light mode toggle |
-| 🤖 **Telegram Bot Management** | Full gateway management via inline Telegram buttons — users, settings, logs, and advanced config |
-| 🔗 **Linked Panels (Other Nodes)** | Connect multiple Nahan panels securely with API Keys for cross-panel management and update propagation |
-
----
-
-## 🔧 Prerequisites
-
-- A **Cloudflare account** (free tier is sufficient) — [sign up here](https://dash.cloudflare.com/sign-up)
-- Access to **Workers & Pages** and **D1 SQLite Database** in your Cloudflare Dashboard
-- A modern web browser
-- *(Optional)* A Telegram Bot Token and Chat ID for bot integration
-
----
-
-## 🚀 Quick Install Options
-
-For easier deployment you can use:
-
-- **Telegram Install Bot:** [@itsyebekhebot](https://t.me/itsyebekhebot)
-- **Web Installer:** [https://erpycode.github.io/nahan-installer/](https://erpycode.github.io/nahan-installer/)
-
-Or follow the manual steps below.
-
----
-
-## 🚀 Step-by-Step Deployment Guide
-
-### Step 1: Create a D1 Database
-
-1. Log in to the [Cloudflare Dashboard](https://dash.cloudflare.com/).
-2. Go to **Storage and databases** → **D1 SQLite Database**.
-3. Click **Create database**.
-4. Enter a name (e.g. `iot_db`) and click **Create**.
-
-### Step 2: Deploy the Worker
-
-1. Go to **Workers & Pages** → **Create application** → **Create Worker**.
-2. Name it (e.g. `nahan-core`) and click **Deploy**.
-3. Click **Edit code**, delete the placeholder, and paste the full content of [`_worker.js`](https://github.com/itsyebekhe/nahan/blob/main/_worker.js).
-4. Click **Save and Deploy**.
-
-### Step 3: Bind the D1 Database
-
-1. Open your Worker → **Settings** → **Bindings** → **Add binding**.
-2. Type: **D1 database**
-3. Variable name: **`IOT_DB`** (must be exact)
-4. Select the database you created → **Save** → **Deploy**.
-
-### Step 4: Access the Dashboard
-
-Open:
+## 🏗️ Architecture
 
 ```
-https://<your-worker-domain>/sync/dash
+                 Incoming Traffic (HTTP / WebSocket)
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │    worker.js    │ (279 lines - Router & Dispatcher)
+                       └────────┬────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        ▼                       ▼                       ▼
+┌───────────────┐       ┌───────────────┐       ┌───────────────┐
+│ src/tunnel.js │       │  src/api.js   │       │  src/subs/    │
+│ VLESS & Trojan│       │ REST APIs     │       │ Transformers  │
+│ WS Sockets    │       │ Auth & Sync   │       │ & Generators  │
+└───────┬───────┘       └───────┬───────┘       └───────┬───────┘
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌───────────────┐       ┌───────────────┐       ┌───────────────┐
+│ src/relays.js │       │  src/db.js    │       │ src/telegram/ │
+│ Health Probes │       │ D1 KV Store   │       │ Bot Webhook   │
+│ & Graveyard   │       │ & Runner Lock │       │ & i18n (FA/EN)│
+└───────────────┘       └───────────────┘       └───────────────┘
 ```
 
-> Visiting `/` or `/sync` without `/dash` shows a camouflage page (Ubuntu/Docker). This is intentional.
+### Module Directory
 
-### Step 5: First-Time Configuration
-
-1. Login with the default master key: `admin`
-2. Immediately go to **System** tab and:
-   - Change **Master Key**
-   - Change **API Route** to a secret path (bookmark the new URL!)
-   - Set or auto-generate **Device UUID**
-3. Click **Update Config**.
-
----
-
-## 🖥️ Dashboard Guide
-
-The dashboard includes these main sections:
-
-| Tab | Purpose |
-|---|---|
-| **Overview** | User summary cards, traffic stats, and update banner |
-| **Endpoints** | Connection URIs, QR codes, and subscription links |
-| **Metrics** | Live usage, Origin IP, Edge Node (Colo), latency diagnostics |
-| **System** | Core settings (protocol, UUID, API Route, Master Key, ports, Auto-Update, Panel API Keys, Backup) |
-| **Advanced** | Clean IPs, Linked Panels, Multi-User, Telegram, Kill Switch, ECH, NAT64, etc. |
-| **Logs** | Login attempts and configuration change history |
-| **Clients** | Visual multi-user management |
-| **Help** | Built-in help and FAQ |
+- `worker.js`: Central request router, telemetry WebSocket upgrade handler, and maintenance site fallback.
+- `src/config.js`: Shared constants, system default settings, circuit breaker thresholds, and in-memory caches.
+- `src/crypto.js`: Pure SHA-224 cryptographic hashing, Trojan password lookup registry, and UUID generators.
+- `src/db.js`: Cloudflare D1 SQLite database binding, distributed runner lease locking, and audit logging.
+- `src/relays.js`: Relay health monitoring, TLS probes, quarantine maps, and graveyard state machine.
+- `src/tunnel.js`: Low-latency WebSocket data streaming, binary header decoding, and TCP socket pipelining.
+- `src/subs/geo.js`: IP geolocation resolution, country flags, and ISP data caching.
+- `src/subs/transformers.js`: Unified proxy schema transformer, fragmentation settings, and upstream VLESS URI parser.
+- `src/subs/generators.js`: Output format adapters (Clash YAML, Clash JSON, Sing-box, V2Ray JSON, and URI lists).
+- `src/telegram/bot.js`: Telegram bot state machine, administrative inline keyboards, and alert notifications.
+- `src/telegram/i18n.js`: English and Persian localized translation tables.
+- `src/api.js`: Administrative REST endpoints (`/api/auth`, `/api/sync`, `/api/users`, `/api/stats`, `/api/keys`, `/api/update`).
 
 ---
 
-## 🔩 Advanced Configuration
+## 🚀 Deployment Guide
 
-### Clean IP Multiplexer
+### Option 1: Browser 1-Click Deployer (No Terminal Required)
+Open `index.html` in your browser (or visit the hosted gateway page):
+1. Enter your **Cloudflare Account ID** and **Cloudflare API Token** (with *Workers:Edit* and *D1:Edit* permissions).
+2. Choose your deployment target (**Worker** or **Pages**).
+3. Click **Deploy to Cloudflare**. The deployer will automatically:
+   - Check or create the D1 database (`nahan-db`).
+   - Bundle and upload the gateway script with required bindings (`IOT_DB`, `nodejs_compat`).
+   - Provide your live gateway dashboard link!
 
-In **Advanced** → **Clean IPs**, enter one IP (or `IP#Name`) per line. The subscription will contain a separate config for each IP.
+---
 
-**Recommended tools for finding Clean IPs:**
-- GitHub: [senpaiscanner](https://github.com/senpaiscanner)
-- Telegram: [@itsZetaBot](https://t.me/itsZetaBot)
+### Option 2: Automated 1-Click Deployer (`nahan-deployer.exe` & `deploy.py`)
 
-### Relay IP
+#### A. Download Pre-Compiled Windows Executable (.exe)
+No Python installation required! Download the standalone executable from [Releases](../../releases):
+1. Download **`nahan-deployer-windows-x64.exe`**.
+2. Double-click to launch or execute in Command Prompt/PowerShell:
+   ```powershell
+   .\nahan-deployer-windows-x64.exe
+   ```
 
-Recommended bot: [@nahanproxyipbot](https://t.me/nahanproxyipbot)
-
-### Linked Panels (Other Nodes)
-
-Connect external Nahan panels using **URL + API Key** for cross-panel management and update propagation.  
-(Legacy `slaveNodes` / Cascade fields are automatically migrated to `linkedPanels`.)
-
-### Multi-User Profiles
-
-Format (one per line):
-
-```
-<uuid>:Username
+#### B. Run with Python CLI
+```bash
+python3 deploy.py
+# Or: npm run deploy:cli
 ```
 
-Access: `https://<worker>/sync/sub?sub=Username`
+**Non-Interactive / CI Flags**:
+```bash
+# Deploy normal worker
+python3 deploy.py --target worker --format normal --api-token "YOUR_TOKEN" --account-id "YOUR_ACCOUNT_ID"
 
-### Telegram Bot
-
-1. Create a bot via [@BotFather](https://t.me/botfather)
-2. Get Chat ID from [@userinfobot](https://t.me/userinfobot)
-3. Enter Token + Chat ID in Advanced tab and save
-
-Commands: `/status`, `/pause` (Kill Switch)
-
-### Kill Switch
-
-Toggle in Advanced (or send `/pause` via Telegram) to immediately stop all proxy traffic while keeping the worker alive.
+# Deploy encrypted/encoded bundle to Cloudflare Pages
+python3 deploy.py --target pages --format encoded --api-token "YOUR_TOKEN" --account-id "YOUR_ACCOUNT_ID"
+```
 
 ---
 
-## 🔗 Useful Resources
+### Option 3: Automated CI/CD via GitHub Actions
 
-| Purpose | Resource |
-|---|---|
-| Clean IP finder | [senpaiscanner](https://github.com/senpaiscanner) · [@itsZetaBot](https://t.me/itsZetaBot) |
-| Relay IP | [@nahanproxyipbot](https://t.me/nahanproxyipbot) |
-| Easy Install (Telegram) | [@itsyebekhebot](https://t.me/itsyebekhebot) |
-| Web Installer | [erpycode.github.io/nahan-installer](https://erpycode.github.io/nahan-installer/) |
+A full-featured deployment workflow is provided at [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 
----
-
-## 💾 Applying Configuration Changes
-
-After changing anything in **System** or **Advanced**:
-
-1. Click **Update Config** at the bottom.
-2. Wait for “Syncing…” then the page reloads.
-
-If you changed the API Route, the page redirects to the new path — bookmark it.
+1. Add your Cloudflare credentials to your GitHub repository secrets (**Settings** > **Secrets and variables** > **Actions**):
+   - `CLOUDFLARE_API_TOKEN` (Required)
+   - `CLOUDFLARE_ACCOUNT_ID` (Required)
+   - `D1_DATABASE_ID` (Optional - auto-creates and binds `nahan-db` if omitted)
+   - `BOT_TOKEN` / `ADMIN_CHAT_ID` (Optional)
+2. **Push or Dispatch**:
+   - Pushes to `main`/`master` deploy automatically.
+   - Go to **Actions** → **Deploy to Cloudflare** → **Run workflow** to choose between **Worker** vs **Pages**, and **Normal** vs **Encoded** code format.
 
 ---
 
-## ❓ FAQ & Troubleshooting
+### Option 4: Manual Deployment via Wrangler CLI
 
-**`⚠️ IOT_DB namespace missing!`**  
-→ D1 binding is missing or the variable name is not exactly `IOT_DB`. Fix in Worker Settings → Bindings and redeploy.
+1. **Install Dependencies & Log In**:
+   ```bash
+   npm install
+   npx wrangler login
+   ```
 
-**Root URL shows Ubuntu/Docker**  
-→ Expected behavior. Always use `/sync/dash` (or your custom API Route + `/dash`).
+2. **Create the D1 Database**:
+   ```bash
+   npx wrangler d1 create nahan-db
+   ```
+   Copy the `database_id` from the terminal output.
 
-**Forgot Master Key or API Route**  
-→ Check values in the D1 Console (`sys_config` key).
+3. **Configure `wrangler.toml`**:
+   Paste your `database_id` into `wrangler.toml`:
+   ```toml
+   name = "nahan-gateway"
+   main = "worker.js"
+   compatibility_date = "2024-03-01"
+   compatibility_flags = ["nodejs_compat"]
 
-**Free plan limits**  
-→ 100,000 requests/day. Monitor via Cloudflare Analytics integration in Advanced.
+   [[d1_databases]]
+   binding = "IOT_DB"
+   database_name = "nahan-db"
+   database_id = "<YOUR_D1_DATABASE_ID>"
+   ```
+
+4. **Deploy**:
+   ```bash
+   npm run deploy
+   ```
 
 ---
 
-## 🤝 Contributing
+## ⚙️ Configuration & Routes
 
-1. Fork the repository
-2. Create a branch
-3. Make your changes
-4. Open a Pull Request
+| Route | Method | Description |
+|---|---|---|
+| `/{apiRoute}` | `GET` | Client Subscription endpoint (auto-detects User-Agent or accepts `?flag=clash`, `sing-box`, `v2ray`) |
+| `/{apiRoute}/dash` | `GET` | Web Administration Dashboard |
+| `/{apiRoute}/api/auth` | `POST` | Dashboard and API authentication |
+| `/{apiRoute}/api/sync` | `POST` | System configuration synchronization |
+| `/{apiRoute}/api/users` | `GET/POST/PUT/DELETE` | Multi-user CRUD, traffic limits, and expiration controls |
+| `/{apiRoute}/api/stats` | `GET` | Live telemetry metrics, active connections, and relay health |
+| `/{apiRoute}/api/keys` | `GET/POST` | API Key management |
+| `/{apiRoute}/tg` | `POST` | Telegram Bot Webhook endpoint |
+
+---
+
+## 🔒 Security & Best Practices
+
+- **Master Key**: The initial default master key is `admin`. Change this immediately via the web dashboard or Telegram bot.
+- **Brute-Force Shield**: IP addresses with 15 failed authorization attempts in a 15-minute window are temporarily rate-limited.
+- **Camouflage Site**: Requests that do not match the secret `apiRoute` automatically proxy a clean camouflage site (default: `https://www.ubuntu.com`), ensuring stealth operation.
+- **Panic Rotation**: In case of compromise, trigger the panic action to immediately randomize the secret API route and revoke active sessions.
+
+---
+
+## 🔐 Worker Converter (Encryption & Obfuscation)
+
+`worker_convertor.py` allows you to bundle and encrypt/obfuscate the entire modular codebase into a single standalone file for easy deployment or code protection:
+
+- **1-Command Bundle & Encrypt (Recommended for single-file deployment)**:
+  ```bash
+  python3 worker_convertor.py encode --bundle -o worker.encoded.js
+  # Or: npm run encode
+  ```
+- **Encode Individual File**:
+  ```bash
+  python3 worker_convertor.py encode -i worker.js -o worker.encoded.js
+  ```
+- **Decode Encrypted Worker Back to Clean Code**:
+  ```bash
+  python3 worker_convertor.py decode -i worker.encoded.js -o worker.decoded.js
+  # Or: npm run decode
+  ```
+
+### ⚡ Automated GitHub Action
+A preconfigured workflow is included in [`.github/workflows/encode.yml`](.github/workflows/encode.yml):
+- **Automatic Execution**: Runs whenever changes are pushed to `main` or `master`.
+- **Manual Trigger**: Go to **Actions** → **Encode & Obfuscate Worker** → **Run workflow** to bundle, encode, and optionally commit `worker.encoded.js` back or download it from workflow artifacts.
 
 ---
 
 ## 📄 License
 
-MIT License — see [LICENSE](./LICENSE)
-
----
-
-<div align="center">
-
-Made with ❤️ by the Open Source Community
-
-[⭐ Star this repo](https://github.com/itsyebekhe/nahan) · [🐛 Report a bug](https://github.com/itsyebekhe/nahan/issues) · [🇮🇷 نسخه فارسی](./README_FA.md)
-
-</div>
+Distributed under the MIT License.

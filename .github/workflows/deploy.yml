@@ -1,0 +1,160 @@
+name: Deploy to Cloudflare (Worker & Pages)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deployment Target'
+        required: true
+        type: choice
+        options:
+          - worker
+          - pages
+        default: worker
+      deploy_version:
+        description: 'Code Format'
+        required: true
+        type: choice
+        options:
+          - normal
+          - encoded
+        default: normal
+      create_d1_if_missing:
+        description: 'Auto-create D1 database if D1_DATABASE_ID secret is not set'
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & Deploy to Cloudflare
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Validate Source Code
+        run: npm run build
+
+      - name: Setup D1 Database ID
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          AUTO_CREATE: ${{ github.event_name == 'workflow_dispatch' && inputs.create_d1_if_missing || true }}
+        run: |
+          TARGET_ID="${D1_DATABASE_ID}"
+
+          # If D1_DATABASE_ID secret is not provided and credentials exist, auto-create or find D1
+          if [ -z "$TARGET_ID" ] && [ -n "$CLOUDFLARE_API_TOKEN" ] && [ "$AUTO_CREATE" = "true" ]; then
+            echo "[*] D1_DATABASE_ID secret not set. Checking or creating D1 database 'nahan-db' via Wrangler..."
+            CREATE_OUTPUT=$(npx wrangler d1 create nahan-db 2>&1 || true)
+            echo "$CREATE_OUTPUT"
+            
+            # Extract database_id from output UUID
+            FOUND_ID=$(echo "$CREATE_OUTPUT" | grep -oE "database_id = \"[0-9a-fA-F-]{36}\"" | cut -d'"' -f2 || true)
+            if [ -z "$FOUND_ID" ]; then
+              # Try searching existing databases
+              FOUND_ID=$(npx wrangler d1 list --json 2>/dev/null | grep -B 2 -A 5 '"name": "nahan-db"' | grep -oE '"uuid": "[0-9a-fA-F-]{36}"' | head -n1 | cut -d'"' -f4 || true)
+            fi
+            
+            if [ -n "$FOUND_ID" ]; then
+              TARGET_ID="$FOUND_ID"
+              echo "[+] Found/Created D1 Database ID: $TARGET_ID"
+            fi
+          fi
+
+          if [ -n "$TARGET_ID" ]; then
+            echo "[*] Injecting D1 Database ID ($TARGET_ID) into wrangler.toml..."
+            sed -i "s/YOUR_D1_DATABASE_ID_HERE/$TARGET_ID/g" wrangler.toml
+            sed -i "s/D1_DATABASE_ID_PLACEHOLDER/$TARGET_ID/g" wrangler.toml
+          else
+            echo "[!] Warning: No D1_DATABASE_ID specified or created. Database operations will use fallback."
+          fi
+
+      - name: Prepare Encoded Code (if requested)
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy_version == 'encoded') }}
+        run: |
+          echo "[*] Bundling and obfuscating code with worker_convertor.py..."
+          python3 worker_convertor.py encode --bundle -o worker.encoded.js
+          sed -i 's/main = "worker.js"/main = "worker.encoded.js"/g' wrangler.toml
+          echo "[+] worker.encoded.js prepared and wrangler.toml updated."
+
+      # Deploy as Cloudflare Worker
+      - name: Deploy Cloudflare Worker
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.deploy_target == 'worker' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Deploy as Cloudflare Pages
+      - name: Deploy Cloudflare Pages
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_target == 'pages' }}
+        run: |
+          echo "[*] Preparing Cloudflare Pages bundle..."
+          mkdir -p dist_pages
+          cp index.html dist_pages/index.html 2>/dev/null || true
+
+          if [ "${{ inputs.deploy_version }}" = "encoded" ]; then
+            cp worker.encoded.js dist_pages/_worker.js
+          else
+            # Bundle modular codebase into single _worker.js for Pages
+            npx wrangler deploy --dry-run --outdir=tmp_bundle
+            cp tmp_bundle/worker.js dist_pages/_worker.js
+            rm -rf tmp_bundle
+          fi
+
+          echo "[*] Deploying to Cloudflare Pages..."
+          npx wrangler pages deploy dist_pages --project-name=nahan-gateway
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Sync Optional Worker Secrets
+        if: ${{ secrets.BOT_TOKEN != '' && (github.event_name != 'workflow_dispatch' || inputs.deploy_target == 'worker') }}
+        run: |
+          echo "[*] Setting BOT_TOKEN secret..."
+          echo "${{ secrets.BOT_TOKEN }}" | npx wrangler secret put BOT_TOKEN || true
+          if [ -n "${{ secrets.ADMIN_CHAT_ID }}" ]; then
+            echo "${{ secrets.ADMIN_CHAT_ID }}" | npx wrangler secret put ADMIN_CHAT_ID || true
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

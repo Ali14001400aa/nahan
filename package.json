@@ -1,0 +1,16 @@
+{
+  "name": "nahan-gateway",
+  "version": "3.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node --check worker.js src/*.js src/**/*.js",
+    "dev": "wrangler dev --port 3000 --ip 0.0.0.0",
+    "deploy": "wrangler deploy",
+    "deploy:cli": "python3 deploy.py",
+    "encode": "python3 worker_convertor.py encode --bundle -o worker.encoded.js",
+    "decode": "python3 worker_convertor.py decode -i worker.encoded.js -o worker.decoded.js"
+  },
+  "devDependencies": {
+    "wrangler": "^3.57.1"
+  }
+}

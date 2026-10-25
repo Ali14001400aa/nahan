@@ -144,6 +144,40 @@ def obfuscate_worker(input_path, output_path):
             except Exception:
                 pass
 
+def bundle_and_obfuscate(output_path):
+    """
+    Bundles worker.js and all src/ modular dependencies into a single file,
+    then obfuscates that bundle into a self-contained output_path.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        print("[*] Bundling modular codebase into single file using wrangler dry-run...")
+        cmd = ["npx", "wrangler", "deploy", "--dry-run", f"--outdir={tmpdir}"]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        bundled_file = os.path.join(tmpdir, "worker.js")
+        if not os.path.exists(bundled_file):
+            print("[!] Error during bundling:\n", proc.stderr)
+            sys.exit(1)
+        print("[*] Bundling complete. Now encoding bundled worker...")
+        obfuscate_worker(bundled_file, output_path)
+
+def encode_all_modules(output_dir="dist"):
+    """
+    Encodes worker.js and all src/ modules into an output directory.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    files_to_encode = ["worker.js"]
+    for root, _, files in os.walk("src"):
+        for f in files:
+            if f.endswith(".js"):
+                files_to_encode.append(os.path.join(root, f))
+    
+    print(f"[*] Encoding {len(files_to_encode)} modular files into '{output_dir}'...")
+    for rel_path in files_to_encode:
+        dest_path = os.path.join(output_dir, rel_path)
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        obfuscate_worker(rel_path, dest_path)
+    print(f"[+] Successfully encoded all modules into '{output_dir}'")
+
 def main():
     parser = argparse.ArgumentParser(description="Worker.js Standalone Converter (Encoder & Decoder)")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -152,6 +186,8 @@ def main():
     encode_parser = subparsers.add_parser("encode", help="Turn normal worker.js into coded/obfuscated worker.js")
     encode_parser.add_argument("-i", "--input", default="worker.js", help="Path to input normal worker.js")
     encode_parser.add_argument("-o", "--output", default="worker.encoded.js", help="Path to output encoded worker.js")
+    encode_parser.add_argument("-b", "--bundle", action="store_true", help="Bundle all modules into a single standalone encrypted worker.js")
+    encode_parser.add_argument("--all", action="store_true", help="Encode worker.js and all src/ modules into an output directory")
 
     # Decode command
     decode_parser = subparsers.add_parser("decode", help="Turn encoded worker.js back to normal readable worker.js")
@@ -161,8 +197,15 @@ def main():
     args = parser.parse_args()
 
     if args.command == "encode":
-        print(f"[*] Encoding {args.input} -> {args.output}...")
-        obfuscate_worker(args.input, args.output)
+        if getattr(args, "bundle", False):
+            print(f"[*] Bundling and encoding to {args.output}...")
+            bundle_and_obfuscate(args.output)
+        elif getattr(args, "all", False):
+            target_dir = args.output if not args.output.endswith(".js") else "dist_encoded"
+            encode_all_modules(target_dir)
+        else:
+            print(f"[*] Encoding {args.input} -> {args.output}...")
+            obfuscate_worker(args.input, args.output)
     elif args.command == "decode":
         print(f"[*] Decoding {args.input} -> {args.output}...")
         with open(args.input, 'r', encoding='utf-8') as f:
