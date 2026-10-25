@@ -108,6 +108,31 @@ def ensure_project_files(target_dir="."):
         return
 
     log_warn(f"worker.js not found in '{target_dir}'.")
+    contents = [f for f in os.listdir(target_dir) if f != ".git"]
+    if contents:
+        log_info(f"Current directory is not empty ({len(contents)} items found).")
+        choice = input(f"{YELLOW}Would you like to download/pull missing files from Nahan repository? (y/n) [y]: {RESET}").strip().lower()
+        if choice in ("", "y", "yes"):
+            repo_url = input(f"Enter repository Git URL [{DEFAULT_REPO}]: ").strip() or DEFAULT_REPO
+            import tempfile, shutil
+            with tempfile.TemporaryDirectory() as tmpdir:
+                log_info(f"Cloning {repo_url} into temporary directory...")
+                subprocess.run(["git", "clone", repo_url, tmpdir], check=True)
+                # Copy missing files
+                for item in os.listdir(tmpdir):
+                    if item == ".git":
+                        continue
+                    src_path = os.path.join(tmpdir, item)
+                    dst_path = os.path.join(target_dir, item)
+                    if not os.path.exists(dst_path):
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, dst_path)
+                        else:
+                            shutil.copy2(src_path, dst_path)
+                        log_info(f"Added missing file/folder: {item}")
+            log_success("Project files updated successfully.")
+            return
+
     choice = input(f"{YELLOW}Would you like to clone the Nahan repository from GitHub? (y/n) [y]: {RESET}").strip().lower()
     if choice in ("", "y", "yes"):
         repo_url = input(f"Enter repository Git URL [{DEFAULT_REPO}]: ").strip() or DEFAULT_REPO
