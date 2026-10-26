@@ -249,6 +249,88 @@ def save_cached_credentials(token=None, account_id=None, method="token"):
         pass
 
 
+def get_wrangler_oauth_token():
+    """Extracts OAuth bearer token from Wrangler's user configuration."""
+    candidates = []
+    xdg_config = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config:
+        candidates.append(os.path.join(xdg_config, ".wrangler", "config", "default.toml"))
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(os.path.join(appdata, ".wrangler", "config", "default.toml"))
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        candidates.append(os.path.join(localappdata, ".wrangler", "config", "default.toml"))
+
+    home = os.path.expanduser("~")
+    candidates.extend([
+        os.path.join(home, ".config", ".wrangler", "config", "default.toml"),
+        os.path.join(home, "Library", "Preferences", ".wrangler", "config", "default.toml"),
+        os.path.join(home, "Library", "Application Support", ".wrangler", "config", "default.toml"),
+        os.path.join(home, ".wrangler", "config", "default.toml"),
+    ])
+
+    for path in candidates:
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                m = re.search(r'oauth_token\s*=\s*"([^"]+)"', content)
+                if m and m.group(1).strip():
+                    return m.group(1).strip()
+            except Exception:
+                pass
+    return None
+
+
+def get_account_id(env_vars=None, token=None):
+    """Finds Account ID from env_vars, cache, Cloudflare API, or wrangler whoami output."""
+    if env_vars and env_vars.get("CLOUDFLARE_ACCOUNT_ID"):
+        return env_vars["CLOUDFLARE_ACCOUNT_ID"]
+
+    cached = load_cached_credentials()
+    if cached and cached.get("account_id"):
+        return cached["account_id"]
+
+    auth_token = token or (env_vars.get("CLOUDFLARE_API_TOKEN") if env_vars else None) or get_wrangler_oauth_token()
+    if auth_token:
+        try:
+            req = urllib.request.Request(
+                "https://api.cloudflare.com/client/v4/accounts",
+                headers={"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+                if data.get("success") and data.get("result"):
+                    accounts = data["result"]
+                    if accounts:
+                        acc_id = accounts[0]["id"]
+                        save_cached_credentials(token=auth_token if not get_wrangler_oauth_token() else None,
+                                                account_id=acc_id,
+                                                method="oauth" if get_wrangler_oauth_token() else "token")
+                        return acc_id
+        except Exception:
+            pass
+
+    try:
+        res = run_command("npx wrangler whoami", env=env_vars, capture=True, check=False)
+        output = res.stdout + "\n" + res.stderr
+        match = re.search(r'│\s*[^│\r\n]+\s*│\s*([0-9a-fA-F]{32})\s*│', output)
+        if match:
+            acc_id = match.group(1)
+            save_cached_credentials(account_id=acc_id, method="oauth")
+            return acc_id
+        hex_match = re.search(r'\b([0-9a-fA-F]{32})\b', output)
+        if hex_match:
+            acc_id = hex_match.group(1)
+            save_cached_credentials(account_id=acc_id, method="oauth")
+            return acc_id
+    except Exception:
+        pass
+
+    return None
+
+
 def check_active_wrangler_session(env_vars=None):
     """Checks whether Wrangler already has an active, authenticated session."""
     try:
@@ -298,6 +380,13 @@ def authenticate_cloudflare(api_token=None, account_id=None, reauth=False):
                 use_oauth = input(f"{CYAN}Use existing OAuth login? (y/n) [y]: {RESET}").strip().lower()
                 if use_oauth in ("", "y", "yes"):
                     log_success("Reusing active Wrangler OAuth session.")
+                    oauth_token = get_wrangler_oauth_token()
+                    if oauth_token:
+                        env_vars["CLOUDFLARE_API_TOKEN"] = oauth_token
+                    resolved_acc = cached_acc or get_account_id(env_vars, token=oauth_token)
+                    if resolved_acc:
+                        env_vars["CLOUDFLARE_ACCOUNT_ID"] = resolved_acc
+                        save_cached_credentials(account_id=resolved_acc, method="oauth")
                     return env_vars
 
     # Check if user already has an active wrangler OAuth session
@@ -306,7 +395,13 @@ def authenticate_cloudflare(api_token=None, account_id=None, reauth=False):
         use_active = input(f"{CYAN}Continue using this existing authenticated session? (y/n) [y]: {RESET}").strip().lower()
         if use_active in ("", "y", "yes"):
             log_success("Using active Wrangler session.")
-            save_cached_credentials(method="oauth")
+            oauth_token = get_wrangler_oauth_token()
+            if oauth_token:
+                env_vars["CLOUDFLARE_API_TOKEN"] = oauth_token
+            resolved_acc = get_account_id(env_vars, token=oauth_token)
+            if resolved_acc:
+                env_vars["CLOUDFLARE_ACCOUNT_ID"] = resolved_acc
+            save_cached_credentials(account_id=resolved_acc, method="oauth")
             return env_vars
 
     print(f"\n{BOLD}Select Cloudflare Authentication Method:{RESET}")
@@ -318,7 +413,13 @@ def authenticate_cloudflare(api_token=None, account_id=None, reauth=False):
     if auth_choice == "2":
         log_info("Opening browser for Cloudflare login...")
         run_command("npx wrangler login")
-        save_cached_credentials(method="oauth")
+        oauth_token = get_wrangler_oauth_token()
+        if oauth_token:
+            env_vars["CLOUDFLARE_API_TOKEN"] = oauth_token
+        resolved_acc = get_account_id(env_vars, token=oauth_token)
+        if resolved_acc:
+            env_vars["CLOUDFLARE_ACCOUNT_ID"] = resolved_acc
+        save_cached_credentials(account_id=resolved_acc, method="oauth")
         log_success("Cloudflare OAuth login completed.")
         return env_vars
 
@@ -456,15 +557,64 @@ def prepare_code(is_encoded=False):
         return "worker.js"
 
 
+def update_wrangler_toml_for_pages(database_id=None, project_name=DEFAULT_PROJECT_NAME):
+    """Configures root wrangler.toml with top-level pages_build_output_dir and D1 database bindings for Pages."""
+    if not os.path.exists("wrangler.toml"):
+        base_toml = f"""name = "{project_name}"
+pages_build_output_dir = "dist_pages"
+compatibility_date = "2024-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "IOT_DB"
+database_name = "nahan-db"
+database_id = "{database_id or 'YOUR_D1_DATABASE_ID_HERE'}"
+"""
+        with open("wrangler.toml", "w", encoding="utf-8") as f:
+            f.write(base_toml)
+        log_success("Configured wrangler.toml for Cloudflare Pages (pages_build_output_dir = 'dist_pages').")
+        return
+
+    with open("wrangler.toml", "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Remove any existing misplaced pages_build_output_dir
+    content = re.sub(r'^\s*pages_build_output_dir\s*=.*$\n?', '', content, flags=re.MULTILINE)
+
+    # Insert pages_build_output_dir right after 'name = ...' so it is a TOP-LEVEL configuration key
+    if re.search(r'^name\s*=', content, re.MULTILINE):
+        content = re.sub(r'^(name\s*=.*)$', r'\1\npages_build_output_dir = "dist_pages"', content, count=1, flags=re.MULTILINE)
+    else:
+        content = 'pages_build_output_dir = "dist_pages"\n' + content
+
+    # Ensure compatibility_flags contains nodejs_compat
+    if "nodejs_compat" not in content:
+        if "compatibility_flags" in content:
+            content = re.sub(r'compatibility_flags\s*=\s*\[(.*?)\]', r'compatibility_flags = [\1, "nodejs_compat"]', content)
+        else:
+            content = re.sub(r'^(pages_build_output_dir\s*=.*)$', r'\1\ncompatibility_flags = ["nodejs_compat"]', content, count=1, flags=re.MULTILINE)
+
+    # Ensure database_id is bound
+    if database_id:
+        content = re.sub(r'database_id\s*=\s*"[^"]*"', f'database_id = "{database_id}"', content)
+        content = content.replace("YOUR_D1_DATABASE_ID_HERE", database_id)
+        content = content.replace("D1_DATABASE_ID_PLACEHOLDER", database_id)
+
+    with open("wrangler.toml", "w", encoding="utf-8") as f:
+        f.write(content)
+    log_success("Configured wrangler.toml with top-level 'pages_build_output_dir = \"dist_pages\"' and D1 binding.")
+
+
 def deploy_worker(entrypoint, env_vars):
     """Deploys as a Cloudflare Worker."""
     log_info("Deploying as Cloudflare Worker...")
 
-    # Ensure wrangler.toml points to the correct entry point
+    # Ensure wrangler.toml points to the correct entry point and removes pages_build_output_dir
     if os.path.exists("wrangler.toml"):
         with open("wrangler.toml", "r", encoding="utf-8") as f:
             content = f.read()
         updated = re.sub(r'main\s*=\s*"[^"]*"', f'main = "{entrypoint}"', content)
+        updated = re.sub(r'^\s*pages_build_output_dir\s*=.*$\n?', '', updated, flags=re.MULTILINE)
         with open("wrangler.toml", "w", encoding="utf-8") as f:
             f.write(updated)
 
@@ -474,18 +624,18 @@ def deploy_worker(entrypoint, env_vars):
 
 
 def bind_d1_to_pages_project(project_name, database_id, env_vars):
-    """Automatically binds D1 database (IOT_DB) and nodejs_compat to a Cloudflare Pages project."""
+    """Automatically binds D1 database (IOT_DB) and nodejs_compat to a Cloudflare Pages project via REST API."""
     if not database_id:
         return
 
-    account_id = env_vars.get("CLOUDFLARE_ACCOUNT_ID")
-    token = env_vars.get("CLOUDFLARE_API_TOKEN")
+    token = env_vars.get("CLOUDFLARE_API_TOKEN") or get_wrangler_oauth_token()
+    account_id = env_vars.get("CLOUDFLARE_ACCOUNT_ID") or get_account_id(env_vars, token=token)
 
     if not account_id or not token:
-        log_info("No direct Cloudflare API token provided; skipping REST API project binding.")
+        log_info("Direct API token or Account ID not found; relying on wrangler.toml native Pages configuration.")
         return
 
-    log_info(f"Automatically binding D1 database 'IOT_DB' ({database_id}) to Pages project '{project_name}'...")
+    log_info(f"Binding D1 database 'IOT_DB' ({database_id}) to Pages project '{project_name}' via Cloudflare REST API...")
     url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/pages/projects/{project_name}"
     payload = {
         "deployment_configs": {
@@ -510,7 +660,6 @@ def bind_d1_to_pages_project(project_name, database_id, env_vars):
 
     try:
         data_bytes = json.dumps(payload).encode("utf-8")
-        # Try PATCH first to update project
         req = urllib.request.Request(
             url,
             data=data_bytes,
@@ -526,6 +675,11 @@ def bind_d1_to_pages_project(project_name, database_id, env_vars):
                 log_success(f"Configured Pages D1 binding 'IOT_DB' -> {database_id} via Cloudflare API!")
                 return
     except urllib.error.HTTPError as e:
+        err_msg = ""
+        try:
+            err_msg = e.read().decode()
+        except Exception:
+            pass
         if e.code == 404:
             # Project doesn't exist yet on API, try creating it with the bindings
             try:
@@ -552,7 +706,7 @@ def bind_d1_to_pages_project(project_name, database_id, env_vars):
             except Exception as ce:
                 log_warn(f"Pages project creation via API notice: {ce}")
         else:
-            log_warn(f"Cloudflare Pages API binding notice ({e.code}): {e.read().decode()[:200]}")
+            log_warn(f"Cloudflare Pages API binding notice ({e.code}): {err_msg[:200]}")
     except Exception as e:
         log_warn(f"Cloudflare Pages API binding notice: {e}")
 
@@ -561,21 +715,25 @@ def deploy_pages(entrypoint, env_vars, project_name=DEFAULT_PROJECT_NAME, databa
     """Deploys as Cloudflare Pages and automatically binds D1 database."""
     log_info(f"Deploying as Cloudflare Pages (Project: {project_name})...")
 
-    # Step 1: Ensure Pages project exists in Wrangler
+    # Step 1: Ensure wrangler.toml in project root is properly configured for Pages (top-level pages_build_output_dir)
+    update_wrangler_toml_for_pages(database_id, project_name)
+
+    # Step 2: Ensure Pages project exists in Wrangler
     run_command(f"npx wrangler pages project create {project_name} --production-branch=main", env=env_vars, check=False)
 
-    # Step 2: Automatically bind D1 database & nodejs_compat via Cloudflare API
+    # Step 3: Automatically bind D1 database & nodejs_compat via Cloudflare API (Pre-deploy)
     if database_id:
         bind_d1_to_pages_project(project_name, database_id, env_vars)
 
     dist_dir = "dist_pages"
     os.makedirs(dist_dir, exist_ok=True)
 
-    # Copy static portal if available
-    if os.path.exists("index.html"):
-        shutil.copy("index.html", os.path.join(dist_dir, "index.html"))
+    # Copy frontend portal files into dist_dir
+    for static_file in ("index.html", "dashboard.html", "subscription.html"):
+        if os.path.exists(static_file):
+            shutil.copy(static_file, os.path.join(dist_dir, static_file))
 
-    # Also generate a wrangler.toml inside dist_pages with the D1 binding
+    # Also generate a wrangler.toml inside dist_pages with the D1 binding as backup
     if database_id:
         pages_toml = f"""name = "{project_name}"
 pages_build_output_dir = "."
@@ -622,8 +780,11 @@ database_id = "{database_id}"
     log_info(f"Executing `npx wrangler pages deploy {dist_dir} --project-name={project_name}`...")
     run_command(f"npx wrangler pages deploy {dist_dir} --project-name={project_name}", env=env_vars)
     log_success("Cloudflare Pages deployed successfully!")
+
+    # Step 4: Ensure D1 binding is confirmed via Cloudflare API (Post-deploy)
     if database_id:
-        log_success(f"D1 Database 'IOT_DB' automatically bound to Pages project '{project_name}'.")
+        bind_d1_to_pages_project(project_name, database_id, env_vars)
+        log_success(f"D1 Database 'IOT_DB' ({database_id}) successfully bound to Pages project '{project_name}'.")
     else:
         print(f"\n{YELLOW}Note for Cloudflare Pages:{RESET}")
         print("In Cloudflare Dashboard -> Workers & Pages -> your Pages project -> Settings -> Functions:")

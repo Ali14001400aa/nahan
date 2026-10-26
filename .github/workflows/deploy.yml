@@ -131,6 +131,11 @@ jobs:
           echo "[*] Preparing Cloudflare Pages bundle..."
           mkdir -p dist_pages
           cp index.html dist_pages/index.html 2>/dev/null || true
+          cp dashboard.html dist_pages/dashboard.html 2>/dev/null || true
+          cp subscription.html dist_pages/subscription.html 2>/dev/null || true
+
+          # Inject top-level pages_build_output_dir into wrangler.toml for Pages support
+          sed -i '/^name =/a pages_build_output_dir = "dist_pages"' wrangler.toml
 
           if [ "${{ inputs.deploy_version }}" = "encoded" ]; then
             cp worker.encoded.js dist_pages/_worker.js
@@ -141,8 +146,20 @@ jobs:
             rm -rf tmp_bundle
           fi
 
+          # Ensure project exists
+          npx wrangler pages project create nahan-gateway --production-branch=main || true
+
           echo "[*] Deploying to Cloudflare Pages..."
           npx wrangler pages deploy dist_pages --project-name=nahan-gateway
+
+          # Automatically bind D1 to Pages project via REST API if database ID is known
+          if [ -n "${TARGET_ID}" ] && [ -n "${CLOUDFLARE_API_TOKEN}" ] && [ -n "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "[*] Binding D1 database ${TARGET_ID} to Pages project via REST API..."
+            curl -s -X PATCH "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/nahan-gateway" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              --data "{\"deployment_configs\":{\"production\":{\"d1_databases\":{\"IOT_DB\":{\"id\":\"${TARGET_ID}\"}},\"compatibility_flags\":[\"nodejs_compat\"]},\"preview\":{\"d1_databases\":{\"IOT_DB\":{\"id\":\"${TARGET_ID}\"}},\"compatibility_flags\":[\"nodejs_compat\"]}}}" || true
+          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
