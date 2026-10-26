@@ -41,6 +41,11 @@ import { getSubscriptionHtml } from "./src/subscriptionHtml.js";
 
 function resolveSubscriptionTarget(reqPath, routeBase, url, sysConfig) {
     let targetSub = url.searchParams.get("sub") || url.searchParams.get("user") || url.searchParams.get("token") || url.searchParams.get("id");
+    const reservedNames = ["sync", "sub", "subscription", "dash", "api", "tg", "deploy", "docs", "wiki", "help", "index", "dashboard"];
+
+    if (targetSub && reservedNames.includes(targetSub.toLowerCase().trim())) {
+        targetSub = null;
+    }
 
     const cleanPath = reqPath.endsWith(".html") ? reqPath.slice(0, -5) : reqPath;
 
@@ -77,6 +82,10 @@ function resolveSubscriptionTarget(reqPath, routeBase, url, sysConfig) {
                 if (match) targetSub = match.name;
             }
         }
+    }
+
+    if (targetSub && reservedNames.includes(targetSub.toLowerCase().trim())) {
+        targetSub = null;
     }
 
     return { isSubRoute: isSubPath || Boolean(targetSub), targetSub };
@@ -406,7 +415,7 @@ export default {
                             );
                             if (targetUser) isValidUser = true;
                         }
-                        if (!targetUser && state.sysConfig.users.length === 1) {
+                        if (!targetUser && state.sysConfig.users.length > 0) {
                             targetUser = state.sysConfig.users[0];
                             isValidUser = true;
                         }

@@ -47,7 +47,8 @@ export function getAllProfiles(targetSub = null) {
         });
     }
     if (targetSub) {
-        list = list.filter((p) => p.name.toLowerCase() === targetSub.toLowerCase() || p.id === targetSub);
+        const filtered = list.filter((p) => p.name.toLowerCase() === targetSub.toLowerCase() || p.id === targetSub);
+        if (filtered.length > 0) return filtered;
     }
     return list;
 }

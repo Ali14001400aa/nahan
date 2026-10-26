@@ -779,18 +779,28 @@
             let normalLink = '__SYNC_NORMAL__';
             if (!normalLink || normalLink.includes('__SYNC_') || normalLink.includes('__')) {
                 const currentUrl = new URL(window.location.href);
+                const reserved = ['sync', 'sub', 'subscription', 'dash', 'api', 'tg', 'deploy', 'docs', 'wiki', 'help', 'index', 'dashboard'];
                 const subParam = currentUrl.searchParams.get('sub') || currentUrl.searchParams.get('user') || currentUrl.searchParams.get('token') || currentUrl.searchParams.get('id');
                 let pathClean = currentUrl.pathname;
                 if (pathClean.endsWith('.html')) pathClean = pathClean.slice(0, -5);
 
-                if (subParam) {
+                if (subParam && !reserved.includes(subParam.toLowerCase().trim())) {
                     normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(subParam);
                 } else if (pathClean.startsWith('/sub/')) {
-                    normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(pathClean.slice(5));
+                    const subName = pathClean.slice(5);
+                    normalLink = subName && !reserved.includes(subName.toLowerCase().trim())
+                        ? currentUrl.origin + '/sync?sub=' + encodeURIComponent(subName)
+                        : currentUrl.origin + '/sync';
                 } else if (pathClean.startsWith('/subscription/')) {
-                    normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(pathClean.slice(14));
-                } else if (pathClean !== '/' && pathClean !== '/subscription' && pathClean !== '/sub') {
-                    normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(pathClean.slice(1));
+                    const subName = pathClean.slice(14);
+                    normalLink = subName && !reserved.includes(subName.toLowerCase().trim())
+                        ? currentUrl.origin + '/sync?sub=' + encodeURIComponent(subName)
+                        : currentUrl.origin + '/sync';
+                } else if (pathClean !== '/' && pathClean !== '/subscription' && pathClean !== '/sub' && pathClean !== '/sync') {
+                    const subName = pathClean.slice(1);
+                    normalLink = subName && !reserved.includes(subName.toLowerCase().trim())
+                        ? currentUrl.origin + '/sync?sub=' + encodeURIComponent(subName)
+                        : currentUrl.origin + '/sync';
                 } else {
                     normalLink = currentUrl.origin + '/sync';
                 }
