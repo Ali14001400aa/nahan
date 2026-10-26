@@ -21,11 +21,64 @@ import argparse
 import subprocess
 import urllib.request
 import urllib.error
+import ssl
 
 try:
     import worker_convertor
 except ImportError:
     worker_convertor = None
+
+
+def make_http_request(url, headers=None, data=None, method=None, timeout=15):
+    """
+    Performs HTTP/HTTPS request with robust SSL handling for corporate proxies,
+    custom CA certificates, and environments where system CA roots are not found.
+    """
+    req_headers = headers or {}
+    if "User-Agent" not in req_headers:
+        req_headers["User-Agent"] = "Mozilla/5.0 (Nahan-Deployer)"
+
+    req = urllib.request.Request(url, headers=req_headers, data=data, method=method)
+
+    # First attempt: standard verified SSL context
+    try:
+        ctx = ssl.create_default_context()
+        return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+    except urllib.error.HTTPError:
+        # HTTP errors (like 400, 404, etc.) are valid server responses, re-raise to caller
+        raise
+    except Exception as e:
+        err_str = str(e).lower()
+        if "certificate" in err_str or "ssl" in err_str or "handshake" in err_str or "verify failed" in err_str:
+            try:
+                unverified_ctx = ssl._create_unverified_context()
+                return urllib.request.urlopen(req, timeout=timeout, context=unverified_ctx)
+            except Exception:
+                raise e
+        raise e
+
+
+def parse_json_safely(text):
+    """Safely extracts and parses JSON array or object from text that may contain CLI logs or banners."""
+    if not text:
+        return None
+    try:
+        return json.loads(text.strip())
+    except Exception:
+        pass
+
+    decoder = json.JSONDecoder()
+    for idx, char in enumerate(text):
+        if char in ('[', '{'):
+            try:
+                obj, _ = decoder.raw_decode(text[idx:])
+                if isinstance(obj, (list, dict)):
+                    return obj
+            except Exception:
+                continue
+    return None
+
+
 
 # ANSI Color Codes
 GREEN = "\033[92m"
@@ -141,10 +194,9 @@ def ensure_project_files(target_dir="."):
         zip_url = f"{zip_url}/archive/refs/heads/main.zip"
 
         log_info(f"Downloading project files from {zip_url}...")
-        import urllib.request, zipfile, io, tempfile, shutil
+        import zipfile, io, tempfile, shutil
         try:
-            req = urllib.request.Request(zip_url, headers={"User-Agent": "Mozilla/5.0 (Nahan-Deployer)"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with make_http_request(zip_url, headers={"User-Agent": "Mozilla/5.0 (Nahan-Deployer)"}, timeout=30) as resp:
                 zip_data = resp.read()
 
             with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
@@ -295,11 +347,8 @@ def get_account_id(env_vars=None, token=None):
     auth_token = token or (env_vars.get("CLOUDFLARE_API_TOKEN") if env_vars else None) or get_wrangler_oauth_token()
     if auth_token:
         try:
-            req = urllib.request.Request(
-                "https://api.cloudflare.com/client/v4/accounts",
-                headers={"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            headers = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
+            with make_http_request("https://api.cloudflare.com/client/v4/accounts", headers=headers, timeout=10) as resp:
                 data = json.loads(resp.read().decode())
                 if data.get("success") and data.get("result"):
                     accounts = data["result"]
@@ -440,11 +489,8 @@ def authenticate_cloudflare(api_token=None, account_id=None, reauth=False):
         log_info("Discovering Account ID from API Token...")
         discovered_acc_id = None
         try:
-            req = urllib.request.Request(
-                "https://api.cloudflare.com/client/v4/accounts",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            with make_http_request("https://api.cloudflare.com/client/v4/accounts", headers=headers, timeout=10) as resp:
                 data = json.loads(resp.read().decode())
                 if data.get("success") and data.get("result"):
                     accounts = data["result"]
@@ -477,39 +523,76 @@ def setup_d1_database(env_vars, db_name=DEFAULT_D1_NAME):
     log_info(f"Setting up D1 Database '{db_name}'...")
 
     database_id = None
+    all_dbs = []
 
     # Step 1: Check existing D1 databases via wrangler d1 list
     list_proc = run_command("npx wrangler d1 list --json", env=env_vars, capture=True, check=False)
-    if list_proc.returncode == 0:
-        try:
-            dbs = json.loads(list_proc.stdout)
-            for db in dbs:
-                if db.get("name") == db_name:
-                    database_id = db.get("uuid")
-                    log_success(f"Found existing D1 database '{db_name}' (ID: {database_id})")
-                    break
-        except Exception:
-            pass
+    combined_output = (list_proc.stdout or "") + "\n" + (list_proc.stderr or "")
+    parsed = parse_json_safely(combined_output)
+    if isinstance(parsed, list):
+        all_dbs = parsed
+    elif isinstance(parsed, dict) and "result" in parsed and isinstance(parsed["result"], list):
+        all_dbs = parsed["result"]
+
+    for db in all_dbs:
+        if isinstance(db, dict) and db.get("name") == db_name:
+            database_id = db.get("uuid")
+            log_success(f"Found existing D1 database '{db_name}' (ID: {database_id})")
+            break
+
+    # Fallback regex search for target database in output if JSON parsing didn't match
+    if not database_id:
+        pattern = rf'["\']?name["\']?\s*:\s*["\']{re.escape(db_name)}["\'].*?["\']?uuid["\']?\s*:\s*["\']([0-9a-fA-F-]{{36}})["\']'
+        m = re.search(pattern, combined_output, re.DOTALL)
+        if m:
+            database_id = m.group(1)
+            log_success(f"Found existing D1 database '{db_name}' (ID: {database_id})")
+        else:
+            pattern_rev = rf'["\']?uuid["\']?\s*:\s*["\']([0-9a-fA-F-]{{36}})["\'].*?["\']?name["\']?\s*:\s*["\']{re.escape(db_name)}["\']'
+            m_rev = re.search(pattern_rev, combined_output, re.DOTALL)
+            if m_rev:
+                database_id = m_rev.group(1)
+                log_success(f"Found existing D1 database '{db_name}' (ID: {database_id})")
 
     # Step 2: Create D1 database if not found
     if not database_id:
         log_info(f"Creating new D1 database '{db_name}'...")
         create_proc = run_command(f"npx wrangler d1 create {db_name}", env=env_vars, capture=True, check=False)
-        output = create_proc.stdout + "\n" + create_proc.stderr
+        output = (create_proc.stdout or "") + "\n" + (create_proc.stderr or "")
         
         match = re.search(r'database_id\s*=\s*"([0-9a-fA-F-]{36})"', output)
         if match:
             database_id = match.group(1)
             log_success(f"Created new D1 database '{db_name}' (ID: {database_id})")
         else:
-            # Fallback search for any 36-char UUID
+            # Fallback search for any 36-char UUID (ignoring error outputs)
             uuid_match = re.search(r'([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})', output)
-            if uuid_match:
+            if uuid_match and "system limit reached" not in output.lower():
                 database_id = uuid_match.group(1)
                 log_success(f"D1 database created (ID: {database_id})")
             else:
-                log_warn(f"Could not extract database_id from output:\n{output}")
-                database_id = input(f"{YELLOW}Enter your D1 Database UUID manually (or press Enter to skip): {RESET}").strip()
+                if "system limit reached" in output.lower() or "code: 7406" in output:
+                    log_warn("Cloudflare account has reached the limit of 10 D1 databases.")
+                else:
+                    log_warn(f"Could not extract database_id from output:\n{output.strip()}")
+
+                # If existing databases exist on the account, allow selecting one
+                if all_dbs:
+                    print(f"\n{CYAN}Existing D1 databases found in your account:{RESET}")
+                    for idx, d in enumerate(all_dbs, 1):
+                        d_name = d.get("name", "unnamed")
+                        d_uuid = d.get("uuid", "")
+                        print(f"  {idx}) {d_name} ({d_uuid})")
+                    print("  0) Enter UUID manually")
+                    sel = input(f"{YELLOW}Select a database to bind (0-{len(all_dbs)}) [1]: {RESET}").strip()
+                    if sel == "" or sel == "1":
+                        database_id = all_dbs[0].get("uuid")
+                    elif sel != "0" and sel.isdigit() and 1 <= int(sel) <= len(all_dbs):
+                        database_id = all_dbs[int(sel) - 1].get("uuid")
+                    else:
+                        database_id = input(f"{YELLOW}Enter your D1 Database UUID manually (or press Enter to skip): {RESET}").strip()
+                else:
+                    database_id = input(f"{YELLOW}Enter your D1 Database UUID manually (or press Enter to skip): {RESET}").strip()
 
     # Step 3: Update wrangler.toml with the database ID
     if database_id and os.path.exists("wrangler.toml"):
@@ -578,6 +661,10 @@ database_id = "{database_id or 'YOUR_D1_DATABASE_ID_HERE'}"
     with open("wrangler.toml", "r", encoding="utf-8") as f:
         content = f.read()
 
+    # CRITICAL FOR PAGES: Wrangler strictly disallows both `main` and `pages_build_output_dir`.
+    # Remove any `main = ...` lines completely.
+    content = re.sub(r'^\s*main\s*=.*$\n?', '', content, flags=re.MULTILINE)
+
     # Remove any existing misplaced pages_build_output_dir
     content = re.sub(r'^\s*pages_build_output_dir\s*=.*$\n?', '', content, flags=re.MULTILINE)
 
@@ -602,7 +689,7 @@ database_id = "{database_id or 'YOUR_D1_DATABASE_ID_HERE'}"
 
     with open("wrangler.toml", "w", encoding="utf-8") as f:
         f.write(content)
-    log_success("Configured wrangler.toml with top-level 'pages_build_output_dir = \"dist_pages\"' and D1 binding.")
+    log_success("Configured wrangler.toml with top-level 'pages_build_output_dir = \"dist_pages\"' and D1 binding (removed 'main').")
 
 
 def deploy_worker(entrypoint, env_vars):
@@ -613,8 +700,14 @@ def deploy_worker(entrypoint, env_vars):
     if os.path.exists("wrangler.toml"):
         with open("wrangler.toml", "r", encoding="utf-8") as f:
             content = f.read()
-        updated = re.sub(r'main\s*=\s*"[^"]*"', f'main = "{entrypoint}"', content)
-        updated = re.sub(r'^\s*pages_build_output_dir\s*=.*$\n?', '', updated, flags=re.MULTILINE)
+        updated = re.sub(r'^\s*pages_build_output_dir\s*=.*$\n?', '', content, flags=re.MULTILINE)
+        if re.search(r'^\s*main\s*=', updated, re.MULTILINE):
+            updated = re.sub(r'^\s*main\s*=.*$', f'main = "{entrypoint}"', updated, flags=re.MULTILINE)
+        else:
+            if re.search(r'^name\s*=', updated, re.MULTILINE):
+                updated = re.sub(r'^(name\s*=.*)$', rf'\1\nmain = "{entrypoint}"', updated, count=1, flags=re.MULTILINE)
+            else:
+                updated = f'main = "{entrypoint}"\n' + updated
         with open("wrangler.toml", "w", encoding="utf-8") as f:
             f.write(updated)
 
@@ -660,16 +753,11 @@ def bind_d1_to_pages_project(project_name, database_id, env_vars):
 
     try:
         data_bytes = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            url,
-            data=data_bytes,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json"
-            },
-            method="PATCH"
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        with make_http_request(url, headers=headers, data=data_bytes, method="PATCH", timeout=15) as resp:
             resp_data = json.loads(resp.read().decode())
             if resp_data.get("success"):
                 log_success(f"Configured Pages D1 binding 'IOT_DB' -> {database_id} via Cloudflare API!")
@@ -689,16 +777,11 @@ def bind_d1_to_pages_project(project_name, database_id, env_vars):
                     "production_branch": "main",
                     "deployment_configs": payload["deployment_configs"]
                 }
-                req = urllib.request.Request(
-                    create_url,
-                    data=json.dumps(create_payload).encode("utf-8"),
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json"
-                    },
-                    method="POST"
-                )
-                with urllib.request.urlopen(req, timeout=15) as resp:
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json"
+                }
+                with make_http_request(create_url, headers=headers, data=json.dumps(create_payload).encode("utf-8"), method="POST", timeout=15) as resp:
                     resp_data = json.loads(resp.read().decode())
                     if resp_data.get("success"):
                         log_success(f"Created Pages project '{project_name}' with D1 binding 'IOT_DB' -> {database_id}!")
@@ -715,20 +798,46 @@ def deploy_pages(entrypoint, env_vars, project_name=DEFAULT_PROJECT_NAME, databa
     """Deploys as Cloudflare Pages and automatically binds D1 database."""
     log_info(f"Deploying as Cloudflare Pages (Project: {project_name})...")
 
-    # Step 1: Ensure wrangler.toml in project root is properly configured for Pages (top-level pages_build_output_dir)
-    update_wrangler_toml_for_pages(database_id, project_name)
-
-    # Step 2: Ensure Pages project exists in Wrangler
-    run_command(f"npx wrangler pages project create {project_name} --production-branch=main", env=env_vars, check=False)
-
-    # Step 3: Automatically bind D1 database & nodejs_compat via Cloudflare API (Pre-deploy)
-    if database_id:
-        bind_d1_to_pages_project(project_name, database_id, env_vars)
-
     dist_dir = "dist_pages"
     os.makedirs(dist_dir, exist_ok=True)
 
-    # Copy frontend portal files into dist_dir
+    # Step 1: Prepare _worker.js BEFORE updating root wrangler.toml for Pages
+    dest_worker = os.path.join(dist_dir, "_worker.js")
+    if entrypoint == "worker.encoded.js" and os.path.exists("worker.encoded.js"):
+        shutil.copy("worker.encoded.js", dest_worker)
+        log_success("Prepared encoded standalone bundle in `dist_pages/_worker.js`.")
+    else:
+        # Bundle into single _worker.js for Pages
+        log_info("Bundling modular codebase into `dist_pages/_worker.js` for Pages...")
+        bundled = False
+        try:
+            if worker_convertor is not None:
+                worker_convertor.bundle_modular_worker(dest_worker)
+                bundled = os.path.exists(dest_worker) and os.path.getsize(dest_worker) > 1000
+        except Exception:
+            pass
+
+        if not bundled:
+            # Fallback 1: esbuild directly
+            res = run_command(f"npx esbuild worker.js --bundle --format=esm --target=es2022 --external:cloudflare:* --external:node:* --outfile={dest_worker}", check=False)
+            if res.returncode == 0 and os.path.exists(dest_worker) and os.path.getsize(dest_worker) > 1000:
+                bundled = True
+
+        if not bundled:
+            # Fallback 2: copy worker.js
+            shutil.copy("worker.js", dest_worker)
+
+    # Step 2: Configure root wrangler.toml for Pages (removes `main`, sets `pages_build_output_dir = "dist_pages"`)
+    update_wrangler_toml_for_pages(database_id, project_name)
+
+    # Step 3: Ensure Pages project exists in Wrangler
+    run_command(f"npx wrangler pages project create {project_name} --production-branch=main", env=env_vars, check=False)
+
+    # Step 4: Automatically bind D1 database & nodejs_compat via Cloudflare API (Pre-deploy)
+    if database_id:
+        bind_d1_to_pages_project(project_name, database_id, env_vars)
+
+    # Step 5: Copy frontend portal files into dist_dir
     for static_file in ("index.html", "dashboard.html", "subscription.html"):
         if os.path.exists(static_file):
             shutil.copy(static_file, os.path.join(dist_dir, static_file))
@@ -747,41 +856,12 @@ database_id = "{database_id}"
         with open(os.path.join(dist_dir, "wrangler.toml"), "w", encoding="utf-8") as f:
             f.write(pages_toml)
 
-    # Prepare _worker.js
-    dest_worker = os.path.join(dist_dir, "_worker.js")
-    if entrypoint == "worker.encoded.js" and os.path.exists("worker.encoded.js"):
-        shutil.copy("worker.encoded.js", dest_worker)
-    else:
-        # Bundle into single _worker.js for Pages
-        log_info("Bundling modular codebase into _worker.js for Pages...")
-        bundled = False
-        try:
-            if worker_convertor is not None:
-                worker_convertor.bundle_modular_worker(dest_worker)
-                bundled = os.path.exists(dest_worker) and os.path.getsize(dest_worker) > 1000
-        except Exception:
-            pass
-
-        if not bundled:
-            # Fallback 1: esbuild directly
-            res = run_command(f"npx esbuild worker.js --bundle --format=esm --target=es2022 --external:cloudflare:* --external:node:* --outfile={dest_worker}", check=False)
-            if res.returncode == 0 and os.path.exists(dest_worker) and os.path.getsize(dest_worker) > 1000:
-                bundled = True
-
-        if not bundled:
-            # Fallback 2: wrangler deploy --dry-run
-            run_command("npx wrangler deploy --dry-run --outdir=tmp_pages_bundle", env=env_vars, check=False)
-            if os.path.exists("tmp_pages_bundle/worker.js"):
-                shutil.copy("tmp_pages_bundle/worker.js", dest_worker)
-                shutil.rmtree("tmp_pages_bundle", ignore_errors=True)
-            else:
-                shutil.copy("worker.js", dest_worker)
-
+    # Step 6: Deploy to Cloudflare Pages
     log_info(f"Executing `npx wrangler pages deploy {dist_dir} --project-name={project_name}`...")
     run_command(f"npx wrangler pages deploy {dist_dir} --project-name={project_name}", env=env_vars)
     log_success("Cloudflare Pages deployed successfully!")
 
-    # Step 4: Ensure D1 binding is confirmed via Cloudflare API (Post-deploy)
+    # Step 7: Ensure D1 binding is confirmed via Cloudflare API (Post-deploy)
     if database_id:
         bind_d1_to_pages_project(project_name, database_id, env_vars)
         log_success(f"D1 Database 'IOT_DB' ({database_id}) successfully bound to Pages project '{project_name}'.")

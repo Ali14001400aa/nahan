@@ -134,9 +134,6 @@ jobs:
           cp dashboard.html dist_pages/dashboard.html 2>/dev/null || true
           cp subscription.html dist_pages/subscription.html 2>/dev/null || true
 
-          # Inject top-level pages_build_output_dir into wrangler.toml for Pages support
-          sed -i '/^name =/a pages_build_output_dir = "dist_pages"' wrangler.toml
-
           if [ "${{ inputs.deploy_version }}" = "encoded" ]; then
             cp worker.encoded.js dist_pages/_worker.js
           else
@@ -145,6 +142,10 @@ jobs:
             cp tmp_bundle/worker.js dist_pages/_worker.js
             rm -rf tmp_bundle
           fi
+
+          # Configure wrangler.toml for Pages: remove main and add pages_build_output_dir
+          sed -i '/^main\s*=/d' wrangler.toml
+          sed -i '/^name =/a pages_build_output_dir = "dist_pages"' wrangler.toml
 
           # Ensure project exists
           npx wrangler pages project create nahan-gateway --production-branch=main || true
