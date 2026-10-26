@@ -63,11 +63,28 @@ def log_error(msg):
     print(f"{RED}[-]{RESET} {BOLD}{msg}{RESET}")
 
 
+def get_clean_env(extra_env=None):
+    """
+    Cleans PyInstaller's LD_LIBRARY_PATH and dynamic linker environment variables
+    so spawned subprocesses (git, node, npm, wrangler) use host system libraries
+    instead of PyInstaller's bundled /tmp/_MEI* libraries.
+    """
+    env = os.environ.copy()
+    if getattr(sys, "frozen", False):
+        for var in ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "LIBPATH"]:
+            orig_var = f"{var}_ORIG"
+            if orig_var in env:
+                env[var] = env[orig_var]
+            else:
+                env.pop(var, None)
+    if extra_env:
+        env.update(extra_env)
+    return env
+
+
 def run_command(cmd, env=None, capture=False, check=True):
     """Executes a shell command with real-time streaming or captured output."""
-    full_env = os.environ.copy()
-    if env:
-        full_env.update(env)
+    full_env = get_clean_env(env)
 
     if capture:
         proc = subprocess.run(cmd, env=full_env, capture_output=True, text=True, shell=isinstance(cmd, str))
@@ -108,37 +125,71 @@ def ensure_project_files(target_dir="."):
         return
 
     log_warn(f"worker.js not found in '{target_dir}'.")
-    contents = [f for f in os.listdir(target_dir) if f != ".git"]
-    if contents:
-        log_info(f"Current directory is not empty ({len(contents)} items found).")
-        choice = input(f"{YELLOW}Would you like to download/pull missing files from Nahan repository? (y/n) [y]: {RESET}").strip().lower()
-        if choice in ("", "y", "yes"):
-            repo_url = input(f"Enter repository Git URL [{DEFAULT_REPO}]: ").strip() or DEFAULT_REPO
-            import tempfile, shutil
-            with tempfile.TemporaryDirectory() as tmpdir:
-                log_info(f"Cloning {repo_url} into temporary directory...")
-                subprocess.run(["git", "clone", repo_url, tmpdir], check=True)
-                # Copy missing files
-                for item in os.listdir(tmpdir):
-                    if item == ".git":
-                        continue
-                    src_path = os.path.join(tmpdir, item)
-                    dst_path = os.path.join(target_dir, item)
-                    if not os.path.exists(dst_path):
+    choice = input(f"{YELLOW}Would you like to download/pull Nahan repository files from GitHub? (y/n) [y]: {RESET}").strip().lower()
+    if choice in ("", "y", "yes"):
+        repo_url = input(f"Enter repository Git URL [{DEFAULT_REPO}]: ").strip() or DEFAULT_REPO
+        
+        # Download as zipball using pure Python - no git or OpenSSL dependency
+        zip_url = repo_url.rstrip("/")
+        if zip_url.endswith(".git"):
+            zip_url = zip_url[:-4]
+        zip_url = f"{zip_url}/archive/refs/heads/main.zip"
+
+        log_info(f"Downloading project files from {zip_url}...")
+        import urllib.request, zipfile, io, tempfile, shutil
+        try:
+            req = urllib.request.Request(zip_url, headers={"User-Agent": "Mozilla/5.0 (Nahan-Deployer)"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                zip_data = resp.read()
+
+            with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    zf.extractall(tmpdir)
+                    extracted_subdirs = [d for d in os.listdir(tmpdir) if os.path.isdir(os.path.join(tmpdir, d))]
+                    source_dir = os.path.join(tmpdir, extracted_subdirs[0]) if extracted_subdirs else tmpdir
+
+                    copied_count = 0
+                    for item in os.listdir(source_dir):
+                        if item in (".git", ".github"):
+                            continue
+                        src_path = os.path.join(source_dir, item)
+                        dst_path = os.path.join(target_dir, item)
+                        if os.path.exists(dst_path):
+                            if os.path.isdir(dst_path):
+                                shutil.rmtree(dst_path)
+                            else:
+                                os.remove(dst_path)
                         if os.path.isdir(src_path):
                             shutil.copytree(src_path, dst_path)
                         else:
                             shutil.copy2(src_path, dst_path)
-                        log_info(f"Added missing file/folder: {item}")
-            log_success("Project files updated successfully.")
+                        copied_count += 1
+            log_success(f"Successfully downloaded and setup project files ({copied_count} files/folders).")
             return
-
-    choice = input(f"{YELLOW}Would you like to clone the Nahan repository from GitHub? (y/n) [y]: {RESET}").strip().lower()
-    if choice in ("", "y", "yes"):
-        repo_url = input(f"Enter repository Git URL [{DEFAULT_REPO}]: ").strip() or DEFAULT_REPO
-        log_info(f"Cloning {repo_url} into {target_dir}...")
-        run_command(["git", "clone", repo_url, target_dir])
-        log_success("Repository cloned successfully.")
+        except Exception as e:
+            log_warn(f"Zip download failed ({e}). Attempting git clone with clean host environment...")
+            try:
+                # Use git clone with cleaned LD_LIBRARY_PATH
+                if target_dir == "." and os.listdir(target_dir):
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        run_command(["git", "clone", repo_url, tmpdir])
+                        for item in os.listdir(tmpdir):
+                            if item in (".git", ".github"):
+                                continue
+                            src_path = os.path.join(tmpdir, item)
+                            dst_path = os.path.join(target_dir, item)
+                            if not os.path.exists(dst_path):
+                                if os.path.isdir(src_path):
+                                    shutil.copytree(src_path, dst_path)
+                                else:
+                                    shutil.copy2(src_path, dst_path)
+                else:
+                    run_command(["git", "clone", repo_url, target_dir])
+                log_success("Repository cloned successfully.")
+                return
+            except Exception as ge:
+                log_error(f"Git clone failed: {ge}")
+                sys.exit(1)
     else:
         log_error("Cannot proceed without project files.")
         sys.exit(1)
