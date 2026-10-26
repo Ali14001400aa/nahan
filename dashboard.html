@@ -4,29 +4,41 @@
       <meta name="apple-mobile-web-app-capable" content="yes">
       <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
       <meta name="mobile-web-app-capable" content="yes">
-      <meta name="theme-color" content="#0d1117">
+      <meta name="theme-color" content="#0B0F19">
       <meta name="apple-mobile-web-app-title" content="Nahan">
       <meta name="format-detection" content="telephone=no">
       <meta name="msapplication-tap-highlight" content="no">
-      <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%236366f1'/><text x='50' y='62' font-size='40' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>N</text></svg>">
+      <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='8' fill='%233B82F6'/><text x='50' y='62' font-size='40' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'>N</text></svg>">
       <title>Nahan Gateway</title>
-      <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&amp;display=swap" rel="stylesheet">
+      <!-- Dithered Design System Typography: Space Grotesk (display), Open Sans (body), IBM Plex Mono (code/mono), Vazirmatn (fa) -->
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Space+Grotesk:wght@500;600;700&family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
       <script src="https://cdn.jsdelivr.net/gh/itsyebekhe/nahan@main/tailwindcss.js"></script>
-            <script>
+      <script>
           tailwind.config = {
     darkMode: 'class',
     theme: {
         extend: {
-            fontFamily: { sans: ['Inter', 'sans-serif'], fa: ['Vazirmatn', 'sans-serif'] },
+            fontFamily: {
+                sans: ['"Open Sans"', '"Vazirmatn"', 'sans-serif'],
+                display: ['"Space Grotesk"', 'sans-serif'],
+                mono: ['"IBM Plex Mono"', 'monospace'],
+                fa: ['"Vazirmatn"', 'sans-serif']
+            },
             colors: {
                 primary: 'var(--color-primary)',
+                secondary: 'var(--color-secondary)',
+                success: 'var(--color-success)',
+                warning: 'var(--color-warning)',
+                danger: 'var(--color-danger)',
                 darkbg: 'var(--color-bg)',
                 darkcard: 'var(--color-surface)',
                 darkborder: 'var(--color-border)',
                 
                 // Map hardcoded colors in HTML to CSS vars
                 white: '#ffffff',
-                black: '#000',
+                black: '#000000',
                 slate: {
                     50: 'var(--slate-50)',
                     100: 'var(--slate-100)',
@@ -39,6 +51,15 @@
                     800: 'var(--slate-800)',
                     900: 'var(--slate-900)',
                 }
+            },
+            borderRadius: {
+                sm: '4px',
+                md: '8px',
+                DEFAULT: '4px',
+                lg: '8px',
+                xl: '8px',
+                '2xl': '8px',
+                '3xl': '8px',
             }
         }
     }
@@ -47,190 +68,220 @@
       
   <style>
 :root {
-    --color-text: #0f172a;
-    --color-text-muted: #475569;
-    --color-primary: #6366f1; --color-primary-hover: #4f46e5;
-    --color-bg: var(--slate-50);
-    --color-surface: #ffffff;
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
+    /* Dithered Design System Tokens from DESIGN.md */
+    --color-primary: #3B82F6;
+    --color-primary-hover: #2563EB;
+    --color-secondary: #8B5CF6;
+    --color-success: #16A34A;
+    --color-warning: #D97706;
+    --color-danger: #DC2626;
+    --color-surface: #FFFFFF;
+    --color-text: #111827;
+    --color-text-muted: #64748B;
+    --color-bg: #F8FAFC;
+    --color-bg-alt: #F1F5F9;
+    --color-border: #E2E8F0;
+
+    --dither-dot-color: rgba(59, 130, 246, 0.12);
+    --dither-grid-size: 8px;
 
     /* Light Mode slate mappings */
-    --slate-50: #f8fafc;
-    --slate-100: #f1f5f9;
-    --slate-200: #e2e8f0;
-    --slate-300: #cbd5e1;
-    --slate-400: #94a3b8;
-    --slate-500: #64748b;
+    --slate-50: #F8FAFC;
+    --slate-100: #F1F5F9;
+    --slate-200: #E2E8F0;
+    --slate-300: #CBD5E1;
+    --slate-400: #94A3B8;
+    --slate-500: #64748B;
     --slate-600: #475569;
     --slate-700: #334155;
-    --slate-800: #1e293b;
-    --slate-900: #0f172a;
+    --slate-800: #1E293B;
+    --slate-900: #0F172A;
 }
 html.dark {
-    --color-text: #f1f5f9;
-    --color-text-muted: #cbd5e1;
-    --color-primary: #818cf8; --color-primary-hover: #6366f1;
-    --color-bg: var(--slate-900);
-    --color-surface: var(--slate-800);
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
+    --color-primary: #3B82F6;
+    --color-primary-hover: #2563EB;
+    --color-secondary: #8B5CF6;
+    --color-success: #16A34A;
+    --color-warning: #D97706;
+    --color-danger: #DC2626;
+    --color-surface: #111827;
+    --color-text: #F9FAFB;
+    --color-text-muted: #9CA3AF;
+    --color-bg: #0B0F19;
+    --color-bg-alt: #1F2937;
+    --color-border: #1F2937;
+
+    --dither-dot-color: rgba(59, 130, 246, 0.2);
 
     /* Dark Mode slate mappings */
-    --slate-50: #090d16;
-    --slate-100: #151b26;
-    --slate-200: #222b3c;
-    --slate-300: #cbd5e1;
-    --slate-400: #94a3b8;
-    --slate-500: #64748b;
-    --slate-600: #475569;
-    --slate-700: #cbd5e1;
-    --slate-800: #0f172a;
-    --slate-900: #090d16;
+    --slate-50: #090D16;
+    --slate-100: #151B26;
+    --slate-200: #1F2937;
+    --slate-300: #CBD5E1;
+    --slate-400: #94A3B8;
+    --slate-500: #64748B;
+    --slate-600: #9CA3AF;
+    --slate-700: #CBD5E1;
+    --slate-800: #111827;
+    --slate-900: #0B0F19;
 }
 /* Ocean Theme */
 html[data-theme="ocean"] {
-    --color-primary: #0ea5e9;
-    --color-bg: var(--slate-50);
-    --color-surface: #ffffff;
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
-    --color-text: #082f49;
-    --color-text-muted: #0369a1;
+    --color-primary: #0EA5E9;
+    --color-primary-hover: #0284C7;
+    --color-secondary: #8B5CF6;
+    --color-bg: #F0F9FF;
+    --color-surface: #FFFFFF;
+    --color-bg-alt: #E0F2FE;
+    --color-border: #BAE6FD;
+    --color-text: #0C4A6E;
+    --color-text-muted: #0369A1;
 
-    --slate-50: #f0f9ff;
-    --slate-100: #e0f2fe;
-    --slate-200: #bae6fd;
-    --slate-300: #7dd3fc;
-    --slate-400: #38bdf8;
-    --slate-500: #0ea5e9;
-    --slate-600: #0284c7;
-    --slate-700: #0369a1;
+    --slate-50: #F0F9FF;
+    --slate-100: #E0F2FE;
+    --slate-200: #BAE6FD;
+    --slate-300: #7DD3FC;
+    --slate-400: #38BDF8;
+    --slate-500: #0EA5E9;
+    --slate-600: #0284C7;
+    --slate-700: #0369A1;
     --slate-800: #075985;
-    --slate-900: #0c4a6e;
+    --slate-900: #0C4A6E;
 }
 html[data-theme="ocean"].dark {
-    --color-primary: #38bdf8;
-    --color-bg: var(--slate-900);
-    --color-surface: var(--slate-800);
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
-    --color-text: #e0f2fe;
-    --color-text-muted: #7dd3fc;
+    --color-primary: #38BDF8;
+    --color-primary-hover: #0EA5E9;
+    --color-secondary: #A78BFA;
+    --color-bg: #031E30;
+    --color-surface: #072F49;
+    --color-bg-alt: #0C4A6E;
+    --color-border: #0C4A6E;
+    --color-text: #E0F2FE;
+    --color-text-muted: #7DD3FC;
 
-    --slate-50: #031e30;
-    --slate-100: #072f49;
-    --slate-200: #0c4a6e;
-    --slate-300: #bae6fd;
-    --slate-400: #7dd3fc;
-    --slate-500: #38bdf8;
-    --slate-600: #0ea5e9;
-    --slate-700: #bae6fd;
-    --slate-800: #072f49;
-    --slate-900: #031e30;
+    --slate-50: #031E30;
+    --slate-100: #072F49;
+    --slate-200: #0C4A6E;
+    --slate-300: #BAE6FD;
+    --slate-400: #7DD3FC;
+    --slate-500: #38BDF8;
+    --slate-600: #0EA5E9;
+    --slate-700: #BAE6FD;
+    --slate-800: #072F49;
+    --slate-900: #031E30;
 }
 /* Forest Theme */
 html[data-theme="forest"] {
-    --color-primary: #10b981;
-    --color-bg: var(--slate-50);
-    --color-surface: #ffffff;
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
-    --color-text: #022c22;
-    --color-text-muted: #15803d;
+    --color-primary: #16A34A;
+    --color-primary-hover: #15803D;
+    --color-secondary: #3B82F6;
+    --color-bg: #F0FDF4;
+    --color-surface: #FFFFFF;
+    --color-bg-alt: #DCFCE7;
+    --color-border: #BBF7D0;
+    --color-text: #022C22;
+    --color-text-muted: #15803D;
 
-    --slate-50: #f0fdf4;
-    --slate-100: #dcfce7;
-    --slate-200: #bbf7d0;
-    --slate-300: #86efac;
-    --slate-400: #4ade80;
-    --slate-500: #22c55e;
-    --slate-600: #16a34a;
-    --slate-700: #15803d;
+    --slate-50: #F0FDF4;
+    --slate-100: #DCFCE7;
+    --slate-200: #BBF7D0;
+    --slate-300: #86EFAC;
+    --slate-400: #4ADE80;
+    --slate-500: #22C55E;
+    --slate-600: #16A34A;
+    --slate-700: #15803D;
     --slate-800: #166534;
-    --slate-900: #14532d;
+    --slate-900: #14532D;
 }
 html[data-theme="forest"].dark {
-    --color-primary: #34d399;
-    --color-bg: var(--slate-900);
-    --color-surface: var(--slate-800);
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
-    --color-text: #dcfce7;
-    --color-text-muted: #86efac;
+    --color-primary: #34D399;
+    --color-primary-hover: #10B981;
+    --color-secondary: #60A5FA;
+    --color-bg: #021A11;
+    --color-surface: #042F1D;
+    --color-bg-alt: #064E3B;
+    --color-border: #064E3B;
+    --color-text: #DCFCE7;
+    --color-text-muted: #86EFAC;
 
-    --slate-50: #021a11;
-    --slate-100: #042f1d;
-    --slate-200: #064e3b;
-    --slate-300: #bbf7d0;
-    --slate-400: #86efac;
-    --slate-500: #4ade80;
-    --slate-600: #22c55e;
-    --slate-700: #bbf7d0;
-    --slate-800: #042f1d;
-    --slate-900: #021a11;
+    --slate-50: #021A11;
+    --slate-100: #042F1D;
+    --slate-200: #064E3B;
+    --slate-300: #BBF7D0;
+    --slate-400: #86EFAC;
+    --slate-500: #4ADE80;
+    --slate-600: #22C55E;
+    --slate-700: #BBF7D0;
+    --slate-800: #042F1D;
+    --slate-900: #021A11;
 }
 /* Sunset Theme */
 html[data-theme="sunset"] {
-    --color-primary: #f43f5e;
-    --color-bg: var(--slate-50);
-    --color-surface: #ffffff;
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
-    --color-text: #4c0519;
-    --color-text-muted: #e03131;
+    --color-primary: #F43F5E;
+    --color-primary-hover: #E11D48;
+    --color-secondary: #8B5CF6;
+    --color-bg: #FFF5F5;
+    --color-surface: #FFFFFF;
+    --color-bg-alt: #FFE3E3;
+    --color-border: #FFC9C9;
+    --color-text: #4C0519;
+    --color-text-muted: #E03131;
 
-    --slate-50: #fff5f5;
-    --slate-100: #ffe3e3;
-    --slate-200: #ffc9c9;
-    --slate-300: #ffa8a8;
-    --slate-400: #ff8787;
-    --slate-500: #ff6b6b;
-    --slate-600: #fa5252;
-    --slate-700: #e03131;
-    --slate-800: #c92a2a;
-    --slate-900: #4c0519;
+    --slate-50: #FFF5F5;
+    --slate-100: #FFE3E3;
+    --slate-200: #FFC9C9;
+    --slate-300: #FFA8A8;
+    --slate-400: #FF8787;
+    --slate-500: #FF6B6B;
+    --slate-600: #FA5252;
+    --slate-700: #E03131;
+    --slate-800: #C92A2A;
+    --slate-900: #4C0519;
 }
 html[data-theme="sunset"].dark {
-    --color-primary: #fb7185;
-    --color-bg: var(--slate-900);
-    --color-surface: var(--slate-800);
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
-    --color-text: #ffe4e6;
-    --color-text-muted: #ffa8a8;
+    --color-primary: #FB7185;
+    --color-primary-hover: #F43F5E;
+    --color-secondary: #C084FC;
+    --color-bg: #1F030A;
+    --color-surface: #3B0713;
+    --color-bg-alt: #5C091F;
+    --color-border: #5C091F;
+    --color-text: #FFE4E6;
+    --color-text-muted: #FFA8A8;
 
-    --slate-50: #1f030a;
-    --slate-100: #3b0713;
-    --slate-200: #5c091f;
-    --slate-300: #ffc9c9;
-    --slate-400: #ffa8a8;
-    --slate-500: #ff8787;
-    --slate-600: #ff6b6b;
-    --slate-700: #ffc9c9;
-    --slate-800: #3b0713;
-    --slate-900: #1f030a;
+    --slate-50: #1F030A;
+    --slate-100: #3B0713;
+    --slate-200: #5C091F;
+    --slate-300: #FFC9C9;
+    --slate-400: #FFA8A8;
+    --slate-500: #FF8787;
+    --slate-600: #FF6B6B;
+    --slate-700: #FFC9C9;
+    --slate-800: #3B0713;
+    --slate-900: #1F030A;
 }
 /* Dracula Theme */
 html[data-theme="dracula"] {
-    --color-primary: #bd93f9;
-    --color-bg: var(--slate-900);
-    --color-surface: var(--slate-800);
-    --color-bg-alt: var(--slate-100);
-    --color-border: var(--slate-200);
-    --color-text: #f8f8f2;
-    --color-text-muted: #6272a4;
+    --color-primary: #BD93F9;
+    --color-primary-hover: #A774EE;
+    --color-secondary: #FF79C6;
+    --color-bg: #1E1F29;
+    --color-surface: #282A36;
+    --color-bg-alt: #44475A;
+    --color-border: #44475A;
+    --color-text: #F8F8F2;
+    --color-text-muted: #6272A4;
 
-    --slate-50: #1e1f29;
-    --slate-100: #282a36;
-    --slate-200: #44475a;
-    --slate-300: #f8f8f2;
-    --slate-400: #6272a4;
-    --slate-500: #bd93f9;
-    --slate-600: #ff79c6;
-    --slate-700: #f8f8f2;
-    --slate-800: #282a36;
-    --slate-900: #1e1f29;
+    --slate-50: #1E1F29;
+    --slate-100: #282A36;
+    --slate-200: #44475A;
+    --slate-300: #F8F8F2;
+    --slate-400: #6272A4;
+    --slate-500: #BD93F9;
+    --slate-600: #FF79C6;
+    --slate-700: #F8F8F2;
+    --slate-800: #282A36;
+    --slate-900: #1E1F29;
 }
 
 html[lang="fa"] body, html[lang="fa"] body *:not(.font-mono) {
@@ -240,21 +291,48 @@ html[lang="fa"] body, html[lang="fa"] body *:not(.font-mono) {
 body {
     background: var(--color-bg);
     color: var(--color-text);
-    font-family: 'Inter', sans-serif;
-    transition: background 0.3s ease, color 0.3s ease;
+    font-family: 'Open Sans', 'Vazirmatn', sans-serif;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
-/* Perfect form styling with excellent contrast for every theme */
+h1, h2, h3, h4, h5, #view-title, .font-display {
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 700;
+}
+
+.font-mono, #app-version, #top-version-badge, code, pre {
+    font-family: 'IBM Plex Mono', monospace !important;
+}
+
+/* Dithered Dot Matrix Patterns */
+.dither-bg {
+    background-image: radial-gradient(circle, var(--dither-dot-color) 1.2px, transparent 1.2px);
+    background-size: var(--dither-grid-size) var(--dither-grid-size);
+}
+.dither-dense {
+    background-image: radial-gradient(circle, var(--dither-dot-color) 1.5px, transparent 1.5px);
+    background-size: 6px 6px;
+}
+
+/* Strict 4px and 8px radii constraints from DESIGN.md */
+.rounded-3xl, .rounded-2xl, .rounded-xl {
+    border-radius: 8px !important;
+}
+.rounded-lg, .rounded {
+    border-radius: 4px !important;
+}
+
+/* Form styling with high contrast and 4px radius */
 input[type="text"]:not(.login-input), input[type="password"]:not(.login-input), select, textarea {
     background-color: var(--slate-100) !important;
     color: var(--slate-900) !important;
     border-color: var(--slate-200) !important;
     transition: all 0.2s;
-    border-radius: 0.75rem !important;
+    border-radius: 4px !important;
 }
 input[type="text"]:not(.login-input):focus, input[type="password"]:not(.login-input):focus, select:focus, textarea:focus {
     border-color: var(--color-primary) !important;
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
 }
 html.dark input[type="text"]:not(.login-input), html.dark input[type="password"]:not(.login-input), html.dark select, html.dark textarea {
     background-color: var(--slate-100) !important;
@@ -272,81 +350,101 @@ html.dark select option {
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
 [data-accordion-content] { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+
 .login-input {
     background-color: var(--color-bg-alt) !important;
     border-color: var(--color-border) !important;
     color: var(--color-text) !important;
+    border-radius: 4px !important;
 }
 .login-input:focus {
     border-color: var(--color-primary) !important;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent) !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
 }
-/* Phase 3 Animations */
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+.btn-top-bar {
+    border-radius: 4px !important;
+}
+.nav-item {
+    border-radius: 4px !important;
+    transition: background 0.15s, color 0.15s;
+}
+.nav-item.active {
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    color: var(--color-primary) !important;
+    border-inline-start: 3px solid var(--color-primary);
+}
+
+/* Accessibility: WCAG 2.2 AA visible focus rings */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--color-primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* Animations */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideDown { from { opacity: 0; max-height: 0; } to { opacity: 1; max-height: 500px; } }
-@keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-.animate-fade-in { animation: fadeIn 0.3s ease-out; }
-.animate-slide-down { animation: slideDown 0.3s ease-out; overflow: hidden; }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+.animate-fade-in { animation: fadeIn 0.25s ease-out; }
+.animate-slide-down { animation: slideDown 0.25s ease-out; overflow: hidden; }
 .animate-scale-in { animation: scaleIn 0.2s ease-out; }
 </style></head>
-  <body class="text-[var(--color-text)] h-[100dvh] flex flex-col md:flex-row overflow-hidden selection:bg-primary selection:text-white transition-colors duration-300 bg-[var(--color-bg)]">
+  <body class="text-[var(--color-text)] h-[100dvh] flex flex-col md:flex-row overflow-hidden selection:bg-primary selection:text-white transition-colors duration-200 bg-[var(--color-bg)]">
 
       <!-- Global Controls -->
       <div class="fixed top-4 end-4 md:top-5 md:end-5 flex items-center gap-2 z-50">
-          <span id="top-version-badge" class="hidden md:inline-block px-3 py-1.5 rounded-xl text-[11px] font-mono font-bold" style="background: color-mix(in srgb, var(--color-primary) 12%, transparent); border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent); color: var(--color-primary);">v__CURRENT_VERSION__</span>
-          <a href="https://github.com/itsyebekhe/nahan" id="github-link-btn" target="_blank" class="hidden md:inline-flex btn-top-bar p-2 rounded-xl transition-all" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-muted);">
+          <span id="top-version-badge" class="hidden md:inline-block px-2.5 py-1 rounded-[4px] text-[11px] font-mono font-bold" style="background: color-mix(in srgb, var(--color-primary) 12%, transparent); border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent); color: var(--color-primary);">v__CURRENT_VERSION__</span>
+          <a href="https://github.com/itsyebekhe/nahan" id="github-link-btn" target="_blank" class="hidden md:inline-flex btn-top-bar p-2 rounded-[4px] transition-all" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-muted);" title="GitHub Repository">
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
           </a>
-          <button onclick="toggleLang()" id="lang-toggle" class="btn-top-bar px-3 py-1.5 rounded-xl text-sm font-bold transition-all" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);">EN</button>
-          <button onclick="toggleTheme()" class="btn-top-bar p-2 rounded-xl transition-all" style="background: var(--color-surface); border: 1px solid var(--color-border); color: #f59e0b;">
+          <button onclick="toggleLang()" id="lang-toggle" class="btn-top-bar px-2.5 py-1 rounded-[4px] text-xs font-bold transition-all font-mono" style="background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);">EN</button>
+          <button onclick="toggleTheme()" class="btn-top-bar p-2 rounded-[4px] transition-all" style="background: var(--color-surface); border: 1px solid var(--color-border); color: #f59e0b;" title="Toggle Theme">
               <svg class="w-4 h-4 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
               <svg class="w-4 h-4 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
           </button>
-          <button onclick="logout()" id="btn-logout-mob" class="hidden md:hidden p-2 rounded-xl transition-all" style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#f87171;">
+          <button onclick="logout()" id="btn-logout-mob" class="hidden md:hidden p-2 rounded-[4px] transition-all" style="background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.25);color:#f87171;" title="Logout">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
           </button>
       </div>
 
-      <!-- LOGIN SCREEN -->
-      <div id="login-box" class="absolute inset-0 flex items-center justify-center p-4 z-40 overflow-hidden" style="background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-alt) 50%, var(--color-bg) 100%);">
-          <div class="absolute pointer-events-none rounded-full" style="width:500px;height:500px;top:-100px;left:-150px;background:radial-gradient(circle, var(--color-primary) 0%, transparent 65%); opacity: 0.12;"></div>
-          <div class="absolute pointer-events-none rounded-full" style="width:400px;height:400px;bottom:-80px;right:-100px;background:radial-gradient(circle, var(--color-primary) 0%, transparent 65%); opacity: 0.1;"></div>
+      <!-- LOGIN SCREEN WITH DITHERED RETRO-MODERN AESTHETIC -->
+      <div id="login-box" class="absolute inset-0 flex items-center justify-center p-4 z-40 overflow-hidden dither-bg" style="background-color: var(--color-bg);">
           <div class="relative w-full max-w-sm">
               
-              <div class="text-center mb-8">
-                  <div class="relative inline-flex items-center justify-center mb-5">
-                      <div class="lock-pulse relative w-20 h-20 rounded-3xl flex items-center justify-center" style="background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 25%, transparent), color-mix(in srgb, var(--color-primary) 8%, transparent)); border: 1px solid color-mix(in srgb, var(--color-primary) 45%, transparent); box-shadow: 0 0 40px color-mix(in srgb, var(--color-primary) 25%, transparent), inset 0 1px 0 rgba(255,255,255,0.08);">
-                          <svg class="w-9 h-9 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+              <div class="text-center mb-6">
+                  <div class="relative inline-flex items-center justify-center mb-4">
+                      <div class="lock-pulse relative w-16 h-16 rounded-[8px] flex items-center justify-center" style="background: var(--color-surface); border: 2px solid var(--color-primary); box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);">
+                          <svg class="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                       </div>
                   </div>
-                  <h2 class="text-3xl font-black" style="color: var(--color-text);" data-i18n="title">Nahan Gateway</h2>
-                  <p class="text-sm mt-2" style="color: var(--color-text-muted);">Sign in to manage your gateway</p>
+                  <h2 class="text-2xl font-display font-bold" style="color: var(--color-text);" data-i18n="title">Nahan Gateway</h2>
+                  <p class="text-xs mt-1 font-mono" style="color: var(--color-text-muted);">Cloudflare Tunnel & Gateway Management</p>
               </div>
-              <div class="rounded-3xl p-px" style="background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 45%, transparent), color-mix(in srgb, var(--color-primary) 8%, transparent) 50%, color-mix(in srgb, var(--color-primary) 30%, transparent)); box-shadow: 0 25px 60px rgba(0,0,0,0.15);">
-                  <div class="rounded-3xl p-8" style="background: var(--color-surface);">
-                      <div class="flex items-center gap-2 mb-7 pb-6" style="border-bottom: 1px solid var(--color-border);">
-                          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:#22c55e;box-shadow:0 0 8px #22c55e;"></span>
-                          <span class="text-xs text-emerald-500 font-semibold" data-i18n="system_online">System online</span>
+              <div class="rounded-[8px] p-px" style="background: var(--color-border); box-shadow: 0 8px 30px rgba(0,0,0,0.15);">
+                  <div class="rounded-[8px] p-6 sm:p-7" style="background: var(--color-surface); border: 1px solid var(--color-border);">
+                      <div class="flex items-center gap-2 mb-5 pb-4" style="border-bottom: 1px solid var(--color-border);">
+                          <span class="w-2 h-2 rounded-[2px] flex-shrink-0" style="background:#16A34A;box-shadow:0 0 6px #16A34A;"></span>
+                          <span class="text-xs text-green-600 dark:text-green-400 font-semibold" data-i18n="system_online">System online</span>
                           <span class="flex-1"></span>
-                          <span class="text-xs" style="color: var(--color-text-muted); opacity: 0.8;">🔒 Secure connection</span>
+                          <span class="text-[11px] font-mono" style="color: var(--color-text-muted);">TLS Encrypted</span>
                       </div>
                       __HAS_DB_WARNING__
-                      <div class="mb-5">
-                          <label class="block text-sm font-semibold mb-2.5" style="color: var(--color-text-muted);" data-i18n="login_password">Password</label>
+                      <div class="mb-4">
+                          <label class="block text-xs font-semibold mb-2" style="color: var(--color-text-muted);" data-i18n="login_password">Password</label>
                           <div class="relative">
-                              <div class="absolute inset-y-0 start-0 flex items-center ps-4 text-primary">
+                              <div class="absolute inset-y-0 start-0 flex items-center ps-3 text-primary">
                                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
                               </div>
-                              <input type="password" id="pwd" data-i18n="pass_ph" placeholder="Enter your password" class="login-input w-full ps-11 pe-12 py-3.5 text-sm rounded-2xl outline-none transition-all">
-                              <button type="button" onclick="const n=document.getElementById('pwd');n.type=n.type==='password'?'text':'password'" class="eye-btn absolute inset-y-0 end-0 flex items-center px-4 transition-colors" style="color: var(--color-primary); opacity: 0.6;">
+                              <input type="password" id="pwd" data-i18n="pass_ph" placeholder="Enter your password" class="login-input w-full ps-10 pe-10 py-2.5 text-xs rounded-[4px] outline-none transition-all font-mono">
+                              <button type="button" onclick="const n=document.getElementById('pwd');n.type=n.type==='password'?'text':'password'" class="eye-btn absolute inset-y-0 end-0 flex items-center px-3 transition-colors" style="color: var(--color-primary); opacity: 0.7;" aria-label="Toggle password visibility">
                                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                               </button>
                           </div>
                       </div>
-                      <p id="err-msg" class="hidden text-sm mb-4 flex items-center gap-2 px-3 py-2.5 rounded-xl" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);color:#f87171;"><span>⚠️</span><span data-i18n="err_pass">Wrong password, please try again.</span></p>
-                      <button onclick="doLogin()" class="login-btn btn-shimmer w-full py-3.5 rounded-2xl font-bold text-sm relative overflow-hidden transition-all" style="background: linear-gradient(135deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 80%, black)); color: white; box-shadow: 0 4px 24px color-mix(in srgb, var(--color-primary) 35%, transparent), inset 0 1px 0 rgba(255,255,255,0.1);" data-i18n="login_btn">
+                      <p id="err-msg" class="hidden text-xs mb-3 flex items-center gap-1.5 px-3 py-2 rounded-[4px]" style="background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.3);color:#DC2626;"><span>⚠️</span><span data-i18n="err_pass">Wrong password, please try again.</span></p>
+                      <button onclick="doLogin()" class="login-btn w-full py-2.5 rounded-[4px] font-display font-bold text-xs relative overflow-hidden transition-all bg-primary hover:bg-blue-600 text-white shadow-sm" data-i18n="login_btn">
                           Sign In
                       </button>
                   </div>
