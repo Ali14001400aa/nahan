@@ -837,8 +837,8 @@ def deploy_pages(entrypoint, env_vars, project_name=DEFAULT_PROJECT_NAME, databa
     if database_id:
         bind_d1_to_pages_project(project_name, database_id, env_vars)
 
-    # Step 5: Copy frontend portal files into dist_dir
-    for static_file in ("index.html", "dashboard.html", "subscription.html"):
+    # Step 5: Copy frontend portal files and routing config into dist_dir
+    for static_file in ("index.html", "dashboard.html", "subscription.html", "_routes.json"):
         if os.path.exists(static_file):
             shutil.copy(static_file, os.path.join(dist_dir, static_file))
 

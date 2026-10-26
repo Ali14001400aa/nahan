@@ -775,14 +775,44 @@
             }
         }
 
+        function resolveSubscriptionUrl() {
+            let normalLink = '__SYNC_NORMAL__';
+            if (!normalLink || normalLink.includes('__SYNC_') || normalLink.includes('__')) {
+                const currentUrl = new URL(window.location.href);
+                const subParam = currentUrl.searchParams.get('sub') || currentUrl.searchParams.get('user') || currentUrl.searchParams.get('token') || currentUrl.searchParams.get('id');
+                let pathClean = currentUrl.pathname;
+                if (pathClean.endsWith('.html')) pathClean = pathClean.slice(0, -5);
+
+                if (subParam) {
+                    normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(subParam);
+                } else if (pathClean.startsWith('/sub/')) {
+                    normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(pathClean.slice(5));
+                } else if (pathClean.startsWith('/subscription/')) {
+                    normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(pathClean.slice(14));
+                } else if (pathClean !== '/' && pathClean !== '/subscription' && pathClean !== '/sub') {
+                    normalLink = currentUrl.origin + '/sync?sub=' + encodeURIComponent(pathClean.slice(1));
+                } else {
+                    normalLink = currentUrl.origin + '/sync';
+                }
+            }
+            return normalLink;
+        }
+
         async function fetchDecodedRawContent() {
             try {
                 const rawInput = document.getElementById('link-raw');
-                const rawUrl = rawInput ? rawInput.value : '__SYNC_RAW__';
+                let rawUrl = rawInput ? rawInput.value : '';
+                if (!rawUrl || rawUrl.includes('__SYNC_') || rawUrl.includes('__')) {
+                    const normalLink = resolveSubscriptionUrl();
+                    rawUrl = normalLink + (normalLink.includes('?') ? '&flag=raw' : '?flag=raw');
+                }
                 const res = await fetch(rawUrl);
                 if(!res.ok) throw new Error('Status ' + res.status);
-                const base64Str = await res.text();
-                const decodedText = safeAtob(base64Str.trim());
+                const textVal = await res.text();
+                let decodedText = textVal;
+                if (!textVal.startsWith('vless://') && !textVal.startsWith('trojan://') && !textVal.startsWith('vmess://') && !textVal.startsWith('ss://')) {
+                    decodedText = safeAtob(textVal.trim());
+                }
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     await navigator.clipboard.writeText(decodedText);
                 } else {
@@ -850,6 +880,71 @@
                 if(ipEl) ipEl.textContent = 'Unknown';
             });
 
+        async function hydrateFromApi() {
+            if (!document.body.innerHTML.includes('__USER_NAME__') && !document.body.innerHTML.includes('__SYNC_NORMAL__')) {
+                return;
+            }
+            try {
+                const normalLink = resolveSubscriptionUrl();
+                const jsonUrl = normalLink + (normalLink.includes('?') ? '&flag=json' : '?flag=json');
+                const res = await fetch(jsonUrl);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!data || !data.userName) return;
+
+                const mainEl = document.querySelector('main');
+                if (mainEl) {
+                    mainEl.innerHTML = mainEl.innerHTML
+                        .replace(/__USER_NAME__/g, data.userName || 'Default')
+                        .replace(/__USER_ID__/g, data.userId || '00000000-0000-0000-0000-000000000000')
+                        .replace(/__EXPIRY_DATE__/g, data.expiryDate || 'Unlimited')
+                        .replace(/__STATUS_CODE__/g, data.statusCode || 'active')
+                        .replace(/__TOTAL_GB__/g, data.totalGb || '0.00')
+                        .replace(/__LIMIT_TOTAL_GB__/g, data.limitTotalGb || 'Unlimited')
+                        .replace(/__LIMIT_GB__/g, data.limitTotalGb || 'Unlimited')
+                        .replace(/__DAILY_GB__/g, data.dailyGb || '0.00')
+                        .replace(/__LIMIT_DAILY_GB__/g, data.limitDailyGb || 'Unlimited')
+                        .replace(/__SYNC_NORMAL_BASE64__/g, data.syncNormalBase64 || safeBtoa(normalLink))
+                        .replace(/__SYNC_NORMAL__/g, data.syncNormal || normalLink)
+                        .replace(/__SYNC_RAW__/g, data.syncRaw || (normalLink + '&flag=raw'));
+                }
+
+                applyTheme();
+                applyLang();
+                setupInputs(data.syncNormal || normalLink, data.userName || 'Default');
+            } catch (e) {}
+        }
+
+        function setupInputs(normalLink, userName) {
+            document.querySelectorAll('a').forEach(a => {
+                if(a.href.includes('__SYNC_NORMAL_BASE64__')) {
+                    a.href = a.href.replace('__SYNC_NORMAL_BASE64__', safeBtoa(normalLink));
+                }
+            });
+
+            const v2rayngLink = document.getElementById('v2rayng-link');
+            if (v2rayngLink) {
+                const base64Url = normalLink + (normalLink.includes('?') ? '&flag=base64' : '?flag=base64');
+                v2rayngLink.href = 'v2rayng://install-sub?url=' + encodeURIComponent(base64Url) + '&name=' + encodeURIComponent(userName);
+            }
+
+            const normalInput = document.getElementById('link-normal');
+            const rawFmtInput = document.getElementById('link-raw-fmt');
+            const base64Input = document.getElementById('link-base64-fmt');
+            const singboxInput = document.getElementById('link-singbox-fmt');
+            const clashInput = document.getElementById('link-clash-fmt');
+            const v2raynInput = document.getElementById('link-v2rayn-fmt');
+            const rawHiddenInput = document.getElementById('link-raw');
+
+            if (normalInput) normalInput.value = normalLink;
+            if (rawFmtInput) rawFmtInput.value = normalLink + (normalLink.includes('?') ? '&flag=raw' : '?flag=raw');
+            if (base64Input) base64Input.value = normalLink + (normalLink.includes('?') ? '&flag=base64' : '?flag=base64');
+            if (singboxInput) singboxInput.value = normalLink + (normalLink.includes('?') ? '&flag=singbox' : '?flag=singbox');
+            if (clashInput) clashInput.value = normalLink + (normalLink.includes('?') ? '&flag=clash' : '?flag=clash');
+            if (v2raynInput) v2raynInput.value = normalLink + (normalLink.includes('?') ? '&flag=vjson' : '?flag=vjson');
+            if (rawHiddenInput) rawHiddenInput.value = normalLink + (normalLink.includes('?') ? '&flag=raw' : '?flag=raw');
+        }
+
         (function init() {
             try {
                 const savedTheme = localStorage.getItem('sub-theme');
@@ -861,31 +956,11 @@
             } catch(e) {}
             applyTheme();
             applyLang();
-            
-            const normalLink = '__SYNC_NORMAL__';
-            document.querySelectorAll('a').forEach(a => {
-                if(a.href.includes('__SYNC_NORMAL_BASE64__')) {
-                    a.href = a.href.replace('__SYNC_NORMAL_BASE64__', safeBtoa(normalLink));
-                }
-            });
 
-            const v2rayngLink = document.getElementById('v2rayng-link');
-            if (v2rayngLink) {
-                const base64Url = normalLink + (normalLink.includes('?') ? '&flag=base64' : '?flag=base64');
-                v2rayngLink.href = 'v2rayng://install-sub?url=' + encodeURIComponent(base64Url) + '&name=' + encodeURIComponent('__USER_NAME__');
-            }
+            const normalLink = resolveSubscriptionUrl();
+            setupInputs(normalLink, '__USER_NAME__');
 
-            const rawInput = document.getElementById('link-raw-fmt');
-            const base64Input = document.getElementById('link-base64-fmt');
-            const singboxInput = document.getElementById('link-singbox-fmt');
-            const clashInput = document.getElementById('link-clash-fmt');
-            const v2raynInput = document.getElementById('link-v2rayn-fmt');
-
-            if (rawInput) rawInput.value = normalLink + (normalLink.includes('?') ? '&flag=raw' : '?flag=raw');
-            if (base64Input) base64Input.value = normalLink + (normalLink.includes('?') ? '&flag=base64' : '?flag=base64');
-            if (singboxInput) singboxInput.value = normalLink + (normalLink.includes('?') ? '&flag=singbox' : '?flag=singbox');
-            if (clashInput) clashInput.value = normalLink + (normalLink.includes('?') ? '&flag=clash' : '?flag=clash');
-            if (v2raynInput) v2raynInput.value = normalLink + (normalLink.includes('?') ? '&flag=vjson' : '?flag=vjson');
+            hydrateFromApi();
         })();
     </script>
 </body>

@@ -42,29 +42,31 @@ import { getSubscriptionHtml } from "./src/subscriptionHtml.js";
 function resolveSubscriptionTarget(reqPath, routeBase, url, sysConfig) {
     let targetSub = url.searchParams.get("sub") || url.searchParams.get("user") || url.searchParams.get("token") || url.searchParams.get("id");
 
+    const cleanPath = reqPath.endsWith(".html") ? reqPath.slice(0, -5) : reqPath;
+
     const isSubPath =
         reqPath === routeBase ||
-        reqPath === "/sub" ||
-        reqPath === "/subscription" ||
-        reqPath === `${routeBase}/sub` ||
-        reqPath.startsWith("/sub/") ||
-        reqPath.startsWith("/subscription/") ||
-        reqPath.startsWith(`${routeBase}/sub/`);
+        cleanPath === "/sub" ||
+        cleanPath === "/subscription" ||
+        cleanPath === `${routeBase}/sub` ||
+        cleanPath.startsWith("/sub/") ||
+        cleanPath.startsWith("/subscription/") ||
+        cleanPath.startsWith(`${routeBase}/sub/`);
 
     if (!targetSub) {
-        if (reqPath.startsWith(`${routeBase}/sub/`)) {
-            targetSub = decodeURIComponent(reqPath.slice(`${routeBase}/sub/`.length));
-        } else if (reqPath.startsWith("/sub/")) {
-            targetSub = decodeURIComponent(reqPath.slice(5));
-        } else if (reqPath.startsWith("/subscription/")) {
-            targetSub = decodeURIComponent(reqPath.slice(14));
-        } else if (reqPath.startsWith(`${routeBase}/`)) {
-            const remainder = decodeURIComponent(reqPath.slice(routeBase.length + 1));
+        if (cleanPath.startsWith(`${routeBase}/sub/`)) {
+            targetSub = decodeURIComponent(cleanPath.slice(`${routeBase}/sub/`.length));
+        } else if (cleanPath.startsWith("/sub/")) {
+            targetSub = decodeURIComponent(cleanPath.slice(5));
+        } else if (cleanPath.startsWith("/subscription/")) {
+            targetSub = decodeURIComponent(cleanPath.slice(14));
+        } else if (cleanPath.startsWith(`${routeBase}/`)) {
+            const remainder = decodeURIComponent(cleanPath.slice(routeBase.length + 1));
             if (!remainder.startsWith("dash") && !remainder.startsWith("api") && !remainder.startsWith("tg")) {
                 targetSub = remainder;
             }
-        } else if (reqPath.length > 1 && reqPath !== "/" && !reqPath.includes(".")) {
-            const remainder = decodeURIComponent(reqPath.slice(1));
+        } else if (cleanPath.length > 1 && cleanPath !== "/" && !cleanPath.includes(".")) {
+            const remainder = decodeURIComponent(cleanPath.slice(1));
             if (Array.isArray(sysConfig.users)) {
                 const match = sysConfig.users.find(
                     (u) =>
@@ -80,6 +82,7 @@ function resolveSubscriptionTarget(reqPath, routeBase, url, sysConfig) {
     return { isSubRoute: isSubPath || Boolean(targetSub), targetSub };
 }
 
+
 async function renderSubscriberPortal(request, url, targetUser, clientHost, env) {
     let html = "";
     if (env.SUBSCRIPTION_URL) {
@@ -88,14 +91,14 @@ async function renderSubscriberPortal(request, url, targetUser, clientHost, env)
             if (resp.ok) html = await resp.text();
         } catch (e) {}
     }
+    if (!html) {
+        html = getSubscriptionHtml();
+    }
     if (!html && env.ASSETS) {
         try {
             const assetResp = await env.ASSETS.fetch(new Request(new URL("/subscription.html", url)));
             if (assetResp.status < 400) html = await assetResp.text();
         } catch (e) {}
-    }
-    if (!html) {
-        html = getSubscriptionHtml();
     }
 
     const userName = targetUser.name || "Default";
@@ -450,6 +453,45 @@ export default {
                     const resHeaders = new Headers();
                     resHeaders.set("Cache-Control", "no-store");
                     resHeaders.set("Access-Control-Allow-Origin", "*");
+
+                    if (flag === "json" || flag === "info") {
+                        const userName = targetUser?.name || "Default";
+                        const userId = targetUser?.id || state.activeDeviceId || "00000000-0000-0000-0000-000000000000";
+                        const idClean = userId.replace(/-/g, "").toLowerCase();
+                        const sysU = state.sysUsageCache?.users?.[idClean] || { reqs: 0, dReqs: 0, lastDay: "" };
+                        const todayStr = new Date().toISOString().split("T")[0];
+                        const totalBytesUsed = usageTotalBytes(sysU);
+                        const dailyBytesUsed = usageDailyBytes(sysU, todayStr);
+                        const limitTotalBytes = limitReqToBytes(targetUser?.limitTotalReq || 0);
+                        const limitDailyBytes = limitReqToBytes(targetUser?.limitDailyReq || 0);
+                        const proto = url.protocol || "https:";
+                        const syncBase = `${proto}//${clientHost}/${encodeURI(state.sysConfig.apiRoute)}`;
+                        const hasUsers = Array.isArray(state.sysConfig.users) && state.sysConfig.users.length > 0;
+                        const syncNormal = (targetUser?.name === "Default" && !hasUsers)
+                            ? syncBase
+                            : `${syncBase}?sub=${encodeURIComponent(targetUser?.name || targetUser?.id || "")}`;
+                        const syncRaw = `${syncNormal}${syncNormal.includes("?") ? "&" : "?"}flag=raw`;
+
+                        let expiryDateStr = "Unlimited";
+                        if (targetUser?.expiryMs) {
+                            const expDate = new Date(targetUser.expiryMs);
+                            expiryDateStr = expDate.toISOString().split("T")[0] + " " + expDate.toTimeString().split(" ")[0].slice(0, 5);
+                        }
+
+                        return new Response(JSON.stringify({
+                            userName,
+                            userId,
+                            totalGb: (totalBytesUsed / 1073741824).toFixed(2),
+                            limitTotalGb: targetUser?.limitTotalReq ? (limitTotalBytes / 1073741824).toFixed(2) : "Unlimited",
+                            dailyGb: (dailyBytesUsed / 1073741824).toFixed(2),
+                            limitDailyGb: targetUser?.limitDailyReq ? (limitDailyBytes / 1073741824).toFixed(2) : "Unlimited",
+                            expiryDate: expiryDateStr,
+                            statusCode: targetUser?.isPaused ? "paused" : "active",
+                            syncNormal,
+                            syncRaw,
+                            syncNormalBase64: safeBtoa(syncNormal)
+                        }), { headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" } });
+                    }
 
                     let isClashYaml = flag === "clash" || flag === "yaml" || flag === "meta";
                     let isSingboxJson = flag === "sing" || flag === "singbox" || flag === "sing-box" || flag === "sb";
