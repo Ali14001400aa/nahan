@@ -15,9 +15,56 @@ import {
     getSegStreamExtra,
 } from "./transformers.js";
 
+const DEFAULT_SINGBOX_TEMPLATE = {
+  log: { level: "info", timestamp: true },
+  dns: {
+    servers: [
+      { tag: "google", address: "tls://8.8.8.8", detour: "select" },
+      { tag: "local", address: "223.5.5.5", detour: "direct" }
+    ],
+    rules: [{ outbound: ["any"], server: "local" }],
+    final: "google",
+    strategy: "prefer_ipv4",
+    optimistic: true,
+    reverse_mapping: true
+  },
+  inbounds: [{ type: "mixed", tag: "mixed-in", listen: "127.0.0.1", listen_port: 2080, set_system_proxy: false }],
+  outbounds: ["__OUTBOUNDS__"],
+  route: {
+    rules: [
+      { ip_is_private: true, outbound: "direct" },
+      { protocol: "dns", action: "hijack-dns" },
+      { action: "route", outbound: "select" }
+    ],
+    final: "select",
+    auto_detect_interface: true
+  },
+  experimental: {
+    cache_file: { enabled: true, path: "cache.db", store_dns: true },
+    clash_api: { external_controller: "127.0.0.1:9090", access_control_allow_origin: ["*"], access_control_allow_private_network: true }
+  }
+};
+
+const DEFAULT_V_TEMPLATE = {
+  log: { loglevel: "warning" },
+  inbounds: [
+    { tag: "socks-in", port: 10808, listen: "127.0.0.1", protocol: "socks", settings: { auth: "noauth", udp: true }, sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] } },
+    { tag: "http-in", port: 10809, listen: "127.0.0.1", protocol: "http", settings: { auth: "noauth" }, sniffing: { enabled: true, destOverride: ["http", "tls", "quic"] } }
+  ],
+  outbounds: ["__OUTBOUNDS__"],
+  routing: {
+    domainStrategy: "AsIs",
+    rules: [
+      { type: "field", outboundTag: "block", protocol: ["bittorrent"] },
+      { type: "field", outboundTag: "direct", ip: ["geoip:private", "geoip:cn"], domain: ["geosite:cn"] }
+    ],
+    strategy: "rules"
+  }
+};
+
 let clashTemplate = null;
-let singboxTemplate = null;
-let VTemplate = null;
+let singboxTemplate = DEFAULT_SINGBOX_TEMPLATE;
+let VTemplate = DEFAULT_V_TEMPLATE;
 
 export async function fetchTemplates() {
     const repo = state.sysConfig.githubRepo || "itsyebekhe/nahan";
@@ -27,18 +74,14 @@ export async function fetchTemplates() {
             if (res.ok) clashTemplate = await res.text();
         } catch (e) {}
     }
-    if (!singboxTemplate) {
-        try {
-            const res = await fetchT(`https://raw.githubusercontent.com/${repo}/main/singbox.json`);
-            if (res.ok) singboxTemplate = await res.json();
-        } catch (e) {}
-    }
-    if (!VTemplate) {
-        try {
-            const res = await fetchT(`https://raw.githubusercontent.com/${repo}/main/v.json`);
-            if (res.ok) VTemplate = await res.json();
-        } catch (e) {}
-    }
+    try {
+        const res = await fetchT(`https://raw.githubusercontent.com/${repo}/main/singbox.json`);
+        if (res.ok) singboxTemplate = await res.json();
+    } catch (e) {}
+    try {
+        const res = await fetchT(`https://raw.githubusercontent.com/${repo}/main/v.json`);
+        if (res.ok) VTemplate = await res.json();
+    } catch (e) {}
 }
 
 export function getCustomRouting() {

@@ -725,39 +725,77 @@
 
         function initStatusBadge() {
             const badge = document.getElementById('status-badge');
+            if (!badge) return;
             const t = I18N[currentLang];
             const map = {
-                active: { en: t.active || 'Active', bg: 'var(--green-bg)', border: 'var(--green-border)', color: 'var(--green-text)' },
-                paused: { en: t.paused || 'Paused', bg: 'var(--amber-bg)', border: 'var(--amber-border)', color: 'var(--amber-text)' },
-                expired: { en: t.expired || 'Expired', bg: 'var(--red-bg)', border: 'var(--red-border)', color: 'var(--red-text)' },
-                limit: { en: t.limitExceeded || 'Limit Exceeded', bg: 'var(--red-bg)', border: 'var(--red-border)', color: 'var(--red-text)' },
-                dailyLimit: { en: t.dailyLimitExceeded || 'Daily Limit Exceeded', bg: 'var(--red-bg)', border: 'var(--red-border)', color: 'var(--red-text)' }
+                active: { label: t.active || 'Active', bg: 'var(--green-bg)', border: 'var(--green-border)', color: 'var(--green-text)' },
+                paused: { label: t.paused || 'Paused', bg: 'var(--amber-bg)', border: 'var(--amber-border)', color: 'var(--amber-text)' },
+                expired: { label: t.expired || 'Expired', bg: 'var(--red-bg)', border: 'var(--red-border)', color: 'var(--red-text)' },
+                limit: { label: t.limitExceeded || 'Limit Exceeded', bg: 'var(--red-bg)', border: 'var(--red-border)', color: 'var(--red-text)' },
+                dailyLimit: { label: t.dailyLimitExceeded || 'Daily Limit Exceeded', bg: 'var(--red-bg)', border: 'var(--red-border)', color: 'var(--red-text)' }
             };
             const s = map['__STATUS_CODE__'] || map.active;
-            badge.textContent = s.en;
+            badge.textContent = s.label;
             badge.style.background = s.bg;
             badge.style.borderColor = s.border;
             badge.style.color = s.color;
             badge.style.border = '1px solid ' + s.border;
         }
 
+        function safeBtoa(str) {
+            try {
+                return btoa(unescape(encodeURIComponent(str)));
+            } catch(e) {
+                try { return btoa(str); } catch(_) { return ''; }
+            }
+        }
+
+        function safeAtob(str) {
+            try {
+                return decodeURIComponent(escape(atob(str)));
+            } catch(e) {
+                try { return atob(str); } catch(_) { return str; }
+            }
+        }
+
         function copyLink(id) {
             const el = document.getElementById(id);
+            if (!el) return;
             el.select();
-            navigator.clipboard.writeText(el.value);
-            showToast(I18N[currentLang].copied);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(el.value).then(() => {
+                    showToast(I18N[currentLang].copied);
+                }).catch(() => {
+                    document.execCommand('copy');
+                    showToast(I18N[currentLang].copied);
+                });
+            } else {
+                document.execCommand('copy');
+                showToast(I18N[currentLang].copied);
+            }
         }
 
         async function fetchDecodedRawContent() {
             try {
-                const res = await fetch('__SYNC_RAW__');
-                if(!res.ok) throw new Error('Failed');
+                const rawInput = document.getElementById('link-raw');
+                const rawUrl = rawInput ? rawInput.value : '__SYNC_RAW__';
+                const res = await fetch(rawUrl);
+                if(!res.ok) throw new Error('Status ' + res.status);
                 const base64Str = await res.text();
-                const decodedText = atob(base64Str.trim());
-                await navigator.clipboard.writeText(decodedText);
+                const decodedText = safeAtob(base64Str.trim());
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(decodedText);
+                } else {
+                    const temp = document.createElement('textarea');
+                    temp.value = decodedText;
+                    document.body.appendChild(temp);
+                    temp.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(temp);
+                }
                 showToast(I18N[currentLang].decodedCopied);
             } catch(e) {
-                alert(I18N[currentLang].decodedError + ': ' + e.message);
+                showToast(I18N[currentLang].decodedError + ': ' + e.message);
             }
         }
 
@@ -790,7 +828,10 @@
 
         function showToast(msg) {
             const t = document.getElementById('toast');
-            t.innerText = msg;
+            if (!t) return;
+            const span = t.querySelector('span');
+            if (span) span.textContent = msg;
+            else t.textContent = msg;
             t.style.opacity = '1';
             t.style.transform = 'translate(-50%, 0)';
             setTimeout(() => { 
@@ -824,7 +865,7 @@
             const normalLink = '__SYNC_NORMAL__';
             document.querySelectorAll('a').forEach(a => {
                 if(a.href.includes('__SYNC_NORMAL_BASE64__')) {
-                    a.href = a.href.replace('__SYNC_NORMAL_BASE64__', btoa(normalLink));
+                    a.href = a.href.replace('__SYNC_NORMAL_BASE64__', safeBtoa(normalLink));
                 }
             });
 

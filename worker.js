@@ -37,6 +37,192 @@ import {
     buildVJsonProfile,
 } from "./src/subs/generators.js";
 import { getPortalHtml } from "./src/portalHtml.js";
+import { getSubscriptionHtml } from "./src/subscriptionHtml.js";
+
+function resolveSubscriptionTarget(reqPath, routeBase, url, sysConfig) {
+    let targetSub = url.searchParams.get("sub") || url.searchParams.get("user") || url.searchParams.get("token") || url.searchParams.get("id");
+
+    const isSubPath =
+        reqPath === routeBase ||
+        reqPath === "/sub" ||
+        reqPath === "/subscription" ||
+        reqPath === `${routeBase}/sub` ||
+        reqPath.startsWith("/sub/") ||
+        reqPath.startsWith("/subscription/") ||
+        reqPath.startsWith(`${routeBase}/sub/`);
+
+    if (!targetSub) {
+        if (reqPath.startsWith(`${routeBase}/sub/`)) {
+            targetSub = decodeURIComponent(reqPath.slice(`${routeBase}/sub/`.length));
+        } else if (reqPath.startsWith("/sub/")) {
+            targetSub = decodeURIComponent(reqPath.slice(5));
+        } else if (reqPath.startsWith("/subscription/")) {
+            targetSub = decodeURIComponent(reqPath.slice(14));
+        } else if (reqPath.startsWith(`${routeBase}/`)) {
+            const remainder = decodeURIComponent(reqPath.slice(routeBase.length + 1));
+            if (!remainder.startsWith("dash") && !remainder.startsWith("api") && !remainder.startsWith("tg")) {
+                targetSub = remainder;
+            }
+        } else if (reqPath.length > 1 && reqPath !== "/" && !reqPath.includes(".")) {
+            const remainder = decodeURIComponent(reqPath.slice(1));
+            if (Array.isArray(sysConfig.users)) {
+                const match = sysConfig.users.find(
+                    (u) =>
+                        u.name.toLowerCase() === remainder.toLowerCase() ||
+                        u.id.toLowerCase() === remainder.toLowerCase() ||
+                        u.id.replace(/-/g, "").toLowerCase() === remainder.replace(/-/g, "").toLowerCase(),
+                );
+                if (match) targetSub = match.name;
+            }
+        }
+    }
+
+    return { isSubRoute: isSubPath || Boolean(targetSub), targetSub };
+}
+
+async function renderSubscriberPortal(request, url, targetUser, clientHost, env) {
+    let html = "";
+    if (env.SUBSCRIPTION_URL) {
+        try {
+            const resp = await fetchT(env.SUBSCRIPTION_URL, {}, 4000);
+            if (resp.ok) html = await resp.text();
+        } catch (e) {}
+    }
+    if (!html && env.ASSETS) {
+        try {
+            const assetResp = await env.ASSETS.fetch(new Request(new URL("/subscription.html", url)));
+            if (assetResp.status < 400) html = await assetResp.text();
+        } catch (e) {}
+    }
+    if (!html) {
+        html = getSubscriptionHtml();
+    }
+
+    const userName = targetUser.name || "Default";
+    const userId = targetUser.id || state.activeDeviceId || "00000000-0000-0000-0000-000000000000";
+    const idClean = userId.replace(/-/g, "").toLowerCase();
+
+    const sysU = state.sysUsageCache?.users?.[idClean] || { reqs: 0, dReqs: 0, lastDay: "" };
+    const todayStr = new Date().toISOString().split("T")[0];
+    const totalBytesUsed = usageTotalBytes(sysU);
+    const dailyBytesUsed = usageDailyBytes(sysU, todayStr);
+
+    const limitTotalBytes = limitReqToBytes(targetUser.limitTotalReq || 0);
+    const limitDailyBytes = limitReqToBytes(targetUser.limitDailyReq || 0);
+
+    const totalGbStr = (totalBytesUsed / 1073741824).toFixed(2);
+    const limitTotalGbStr = targetUser.limitTotalReq ? (limitTotalBytes / 1073741824).toFixed(2) : "Unlimited";
+
+    const dailyGbStr = (dailyBytesUsed / 1073741824).toFixed(2);
+    const limitDailyGbStr = targetUser.limitDailyReq ? (limitDailyBytes / 1073741824).toFixed(2) : "Unlimited";
+
+    let expiryDateStr = "Unlimited";
+    let isExpired = false;
+    if (targetUser.expiryMs) {
+        const expDate = new Date(targetUser.expiryMs);
+        expiryDateStr = expDate.toISOString().split("T")[0] + " " + expDate.toTimeString().split(" ")[0].slice(0, 5);
+        if (Date.now() > targetUser.expiryMs) {
+            isExpired = true;
+        }
+    }
+
+    let statusCode = "active";
+    if (targetUser.isPaused && targetUser.disabledReason) {
+        const r = targetUser.disabledReason.toLowerCase();
+        if (r.includes("daily")) statusCode = "dailyLimit";
+        else if (r.includes("traffic") || r.includes("quota") || r.includes("limit")) statusCode = "limit";
+        else if (r.includes("expir")) statusCode = "expired";
+        else statusCode = "paused";
+    } else if (targetUser.isPaused) {
+        statusCode = "paused";
+    } else if (isExpired) {
+        statusCode = "expired";
+    } else if (targetUser.limitTotalReq && totalBytesUsed >= limitTotalBytes) {
+        statusCode = "limit";
+    } else if (targetUser.limitDailyReq && dailyBytesUsed >= limitDailyBytes) {
+        statusCode = "dailyLimit";
+    }
+
+    let totalProgressHtml = "";
+    if (targetUser.limitTotalReq && limitTotalBytes > 0) {
+        const totalPercent = Math.min(100, Math.max(0, (totalBytesUsed / limitTotalBytes) * 100));
+        const totalColor = totalPercent > 90 ? "var(--color-danger)" : (totalPercent > 75 ? "var(--color-warning)" : "var(--color-primary)");
+        const remainingTotalGb = (Math.max(0, limitTotalBytes - totalBytesUsed) / 1073741824).toFixed(2);
+        totalProgressHtml = `
+            <div class="progress-bar-bg w-full">
+                <div class="h-full transition-all duration-300" style="width: ${totalPercent.toFixed(1)}%; background: ${totalColor};"></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-muted font-mono mt-1.5">
+                <span>${totalPercent.toFixed(1)}% Used</span>
+                <span>${remainingTotalGb} GB left</span>
+            </div>`;
+    } else {
+        totalProgressHtml = `
+            <div class="progress-bar-bg w-full">
+                <div class="h-full" style="width: 100%; background: var(--color-primary);"></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-muted font-mono mt-1.5">
+                <span data-i18n="unlimitedPlan">Unlimited Plan</span>
+                <span>0.00 / ∞ GB</span>
+            </div>`;
+    }
+
+    let dailyProgressHtml = "";
+    if (targetUser.limitDailyReq && limitDailyBytes > 0) {
+        const dailyPercent = Math.min(100, Math.max(0, (dailyBytesUsed / limitDailyBytes) * 100));
+        const dailyColor = dailyPercent > 90 ? "var(--color-danger)" : (dailyPercent > 75 ? "var(--color-warning)" : "var(--color-success)");
+        const remainingDailyGb = (Math.max(0, limitDailyBytes - dailyBytesUsed) / 1073741824).toFixed(2);
+        dailyProgressHtml = `
+            <div class="progress-bar-bg w-full">
+                <div class="h-full transition-all duration-300" style="width: ${dailyPercent.toFixed(1)}%; background: ${dailyColor};"></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-muted font-mono mt-1.5">
+                <span>${dailyPercent.toFixed(1)}% Today</span>
+                <span>${remainingDailyGb} GB left</span>
+            </div>`;
+    } else {
+        dailyProgressHtml = `
+            <div class="progress-bar-bg w-full">
+                <div class="h-full" style="width: 100%; background: var(--color-success);"></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-muted font-mono mt-1.5">
+                <span data-i18n="noDailyLimit">No Daily Limit</span>
+                <span>Active Today</span>
+            </div>`;
+    }
+
+    const proto = url.protocol || "https:";
+    const syncBase = `${proto}//${clientHost}/${encodeURI(state.sysConfig.apiRoute)}`;
+    const hasUsers = Array.isArray(state.sysConfig.users) && state.sysConfig.users.length > 0;
+    const syncNormal = (targetUser.name === "Default" && !hasUsers)
+        ? syncBase
+        : `${syncBase}?sub=${encodeURIComponent(targetUser.name || targetUser.id)}`;
+    const syncNormalBase64 = safeBtoa(syncNormal);
+    const syncRaw = `${syncNormal}${syncNormal.includes("?") ? "&" : "?"}flag=raw`;
+
+    const rendered = html
+        .replace(/__USER_NAME__/g, userName)
+        .replace(/__USER_ID__/g, userId)
+        .replace(/__EXPIRY_DATE__/g, expiryDateStr)
+        .replace(/__STATUS_CODE__/g, statusCode)
+        .replace(/__TOTAL_GB__/g, totalGbStr)
+        .replace(/__LIMIT_TOTAL_GB__/g, limitTotalGbStr)
+        .replace(/__LIMIT_GB__/g, limitTotalGbStr)
+        .replace(/__TOTAL_PROGRESS__/g, totalProgressHtml)
+        .replace(/__DAILY_GB__/g, dailyGbStr)
+        .replace(/__LIMIT_DAILY_GB__/g, limitDailyGbStr)
+        .replace(/__DAILY_PROGRESS__/g, dailyProgressHtml)
+        .replace(/__SYNC_NORMAL_BASE64__/g, syncNormalBase64)
+        .replace(/__SYNC_NORMAL__/g, syncNormal)
+        .replace(/__SYNC_RAW__/g, syncRaw);
+
+    return new Response(rendered, {
+        headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+    });
+}
 
 async function serveMaintenancePage(request, url) {
     if (breakerLevel() >= 1) return new Response("Not Found", { status: 404 });
@@ -98,8 +284,9 @@ export default {
             if (reqPath.endsWith("/") && reqPath.length > 1) reqPath = reqPath.slice(0, -1);
 
             const routeBase = `/${encodeURI(state.sysConfig.apiRoute)}`;
+            const { isSubRoute, targetSub } = resolveSubscriptionTarget(reqPath, routeBase, url, state.sysConfig);
             const isAuthorizedRoute =
-                reqPath === routeBase ||
+                isSubRoute ||
                 reqPath === `${routeBase}/dash` ||
                 reqPath === `${routeBase}/api/auth` ||
                 reqPath === `${routeBase}/api/sync` ||
@@ -146,16 +333,32 @@ export default {
 
             if (!isTelemetryStream) {
                 if (reqPath === `${routeBase}/dash`) {
-                    const dashboardUrl = env.DASHBOARD_URL || "https://raw.githubusercontent.com/itsyebekhe/nahan/main/dashboard.html";
-                    try {
-                        const resp = await fetchT(dashboardUrl);
-                        let html = await resp.text();
+                    let html = "";
+                    if (env.DASHBOARD_URL) {
+                        try {
+                            const resp = await fetchT(env.DASHBOARD_URL, {}, 4000);
+                            if (resp.ok) html = await resp.text();
+                        } catch (e) {}
+                    }
+                    if (!html && env.ASSETS) {
+                        try {
+                            const assetResp = await env.ASSETS.fetch(new Request(new URL("/dashboard.html", url)));
+                            if (assetResp.status < 400) html = await assetResp.text();
+                        } catch (e) {}
+                    }
+                    if (!html) {
+                        try {
+                            const fallbackUrl = "https://raw.githubusercontent.com/itsyebekhe/nahan/main/dashboard.html";
+                            const resp = await fetchT(fallbackUrl, {}, 5000);
+                            if (resp.ok) html = await resp.text();
+                        } catch (e) {}
+                    }
+                    if (html) {
                         html = html.replace(/__CURRENT_VERSION__/g, CURRENT_VERSION);
                         html = html.replace("__HAS_DB_WARNING__", env.IOT_DB !== undefined ? "" : '<div class="mb-5 p-4 rounded-2xl flex items-start gap-3" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);"><span style="color:#f87171;">⚠️</span><span class="text-sm" style="color:#fca5a5;">Database not connected. Settings won\'t be saved.</span></div>');
                         return new Response(html, { headers: { "Content-Type": "text/html;charset=utf-8" } });
-                    } catch (e) {
-                        return new Response("Failed to load dashboard", { status: 502 });
                     }
+                    return new Response("Failed to load dashboard", { status: 502 });
                 }
                 if (reqPath === `${routeBase}/api/auth`) return await handleAuth(request, url.hostname, ctx, env);
                 if (reqPath === `${routeBase}/api/sync` || reqPath.endsWith("/api/sync")) {
@@ -182,50 +385,59 @@ export default {
                 if (reqPath === `${routeBase}/tg/sync_panel`) return await handleSyncPanel(request, env, ctx);
                 if (reqPath === `${routeBase}/tg`) return await handleTelegramWebhook(request, env, url.hostname, ctx);
 
-                if (reqPath === routeBase) {
+                if (isSubRoute) {
                     const ua = (request.headers.get("User-Agent") || "").toLowerCase();
                     const clientHost = request.headers.get("Host") || url.hostname;
-                    let targetSub = url.searchParams.get("sub");
-                    const hasMultiUser = state.sysConfig.users && state.sysConfig.users.length > 0;
+                    const hasMultiUser = Array.isArray(state.sysConfig.users) && state.sysConfig.users.length > 0;
                     let targetUser = null;
                     let isValidUser = false;
 
                     if (hasMultiUser) {
                         if (targetSub) {
+                            const cleanSub = targetSub.trim();
                             targetUser = state.sysConfig.users.find(
-                                (u) => u.name.toLowerCase() === targetSub.toLowerCase() || u.id === targetSub,
+                                (u) =>
+                                    u.name.toLowerCase() === cleanSub.toLowerCase() ||
+                                    u.id.toLowerCase() === cleanSub.toLowerCase() ||
+                                    u.id.replace(/-/g, "").toLowerCase() === cleanSub.replace(/-/g, "").toLowerCase(),
                             );
                             if (targetUser) isValidUser = true;
+                        }
+                        if (!targetUser && state.sysConfig.users.length === 1) {
+                            targetUser = state.sysConfig.users[0];
+                            isValidUser = true;
                         }
                     } else {
                         isValidUser = true;
                         targetUser = { id: state.activeDeviceId, name: "Default" };
                     }
 
+                    const flag = (url.searchParams.get("flag") || url.searchParams.get("format") || "").toLowerCase();
                     const acceptHeader = (request.headers.get("Accept") || "").toLowerCase();
                     const secFetchDest = (request.headers.get("Sec-Fetch-Dest") || "").toLowerCase();
-                    const isRealBrowser =
-                        (secFetchDest === "document" || acceptHeader.includes("text/html")) &&
-                        (ua.includes("mozilla") || ua.includes("chrome") || ua.includes("safari")) &&
-                        !ua.includes("clash") && !ua.includes("sing-box") && !ua.includes("v2ray");
 
-                    if (isRealBrowser && !state.sysConfig.subUserAgent) {
-                        if (isValidUser) {
-                            const subUrl = env.SUBSCRIPTION_URL || "https://raw.githubusercontent.com/itsyebekhe/nahan/main/subscription.html";
-                            try {
-                                const resp = await fetchT(subUrl);
-                                let html = await resp.text();
-                                const idClean = targetUser.id.replace(/-/g, "").toLowerCase();
-                                const sysU = state.sysUsageCache?.users?.[idClean] || { reqs: 0, dReqs: 0 };
-                                const totalBytesUsed = usageTotalBytes(sysU);
-                                const limitTotalBytes = limitReqToBytes(targetUser.limitTotalReq);
-                                html = html.replace(/__USER_NAME__/g, targetUser.name);
-                                html = html.replace(/__TOTAL_GB__/g, (totalBytesUsed / 1073741824).toFixed(2));
-                                html = html.replace(/__LIMIT_GB__/g, targetUser.limitTotalReq ? (limitTotalBytes / 1073741824).toFixed(2) : "Unlimited");
-                                return new Response(html, { headers: { "Content-Type": "text/html;charset=utf-8" } });
-                            } catch (e) {
-                                return new Response("Failed to load subscription page", { status: 502 });
-                            }
+                    const isExplicitFormat = Boolean(flag);
+                    const isClientAgent =
+                        ua.includes("clash") ||
+                        ua.includes("sing-box") ||
+                        ua.includes("singbox") ||
+                        ua.includes("hiddify") ||
+                        ua.includes("v2ray") ||
+                        ua.includes("shadowrocket") ||
+                        ua.includes("streisand") ||
+                        ua.includes("meta") ||
+                        ua.includes("mihomo") ||
+                        ua.includes(getGamma());
+
+                    const isRealBrowser =
+                        !isExplicitFormat &&
+                        !isClientAgent &&
+                        (secFetchDest === "document" || acceptHeader.includes("text/html") || ua.includes("mozilla") || ua.includes("chrome") || ua.includes("safari"));
+
+                    if (isRealBrowser || flag === "html" || url.searchParams.get("view") === "html") {
+                        if (isValidUser || (hasMultiUser && !targetUser)) {
+                            const effectiveUser = targetUser || state.sysConfig.users[0];
+                            return await renderSubscriberPortal(request, url, effectiveUser, clientHost, env);
                         }
                         return serveMaintenancePage(request, url);
                     }
@@ -239,32 +451,37 @@ export default {
                     resHeaders.set("Cache-Control", "no-store");
                     resHeaders.set("Access-Control-Allow-Origin", "*");
 
-                    const flag = (url.searchParams.get("flag") || url.searchParams.get("format") || "").toLowerCase();
                     let isClashYaml = flag === "clash" || flag === "yaml" || flag === "meta";
                     let isSingboxJson = flag === "sing" || flag === "singbox" || flag === "sing-box" || flag === "sb";
                     let isClashJson = flag === "clash-json" || flag === "b";
                     let isVJson = flag === "vjson" || flag === "v";
+                    let isRaw = flag === "raw" || flag === "text" || flag === "uri";
 
-                    if (!isClashYaml && !isSingboxJson && !isClashJson && !isVJson) {
+                    if (!isClashYaml && !isSingboxJson && !isClashJson && !isVJson && !isRaw) {
                         if (ua.includes(getGamma()) || ua.includes("meta") || ua.includes("mihomo")) isClashYaml = true;
                         else if (ua.includes("sing-box") || ua.includes("singbox") || ua.includes("hiddify")) isSingboxJson = true;
                     }
 
+                    const subParam = targetUser?.name || targetSub;
+
                     if (isClashYaml) {
                         resHeaders.set("Content-Type", "text/yaml; charset=utf-8");
-                        return new Response(await buildYamlProfile(clientHost, targetSub, allowInsecure), { headers: resHeaders });
+                        return new Response(await buildYamlProfile(clientHost, subParam, allowInsecure), { headers: resHeaders });
                     } else if (isSingboxJson) {
                         resHeaders.set("Content-Type", "application/json; charset=utf-8");
-                        return new Response(JSON.stringify(await buildSingBoxJsonProfile(clientHost, targetSub, allowInsecure), null, 2), { headers: resHeaders });
+                        return new Response(JSON.stringify(await buildSingBoxJsonProfile(clientHost, subParam, allowInsecure), null, 2), { headers: resHeaders });
                     } else if (isClashJson) {
                         resHeaders.set("Content-Type", "application/json; charset=utf-8");
-                        return new Response(JSON.stringify(await buildClashJsonProfile(clientHost, targetSub, allowInsecure), null, 2), { headers: resHeaders });
+                        return new Response(JSON.stringify(await buildClashJsonProfile(clientHost, subParam, allowInsecure), null, 2), { headers: resHeaders });
                     } else if (isVJson) {
                         resHeaders.set("Content-Type", "application/json; charset=utf-8");
-                        return new Response(JSON.stringify(await buildVJsonProfile(clientHost, targetSub, allowInsecure), null, 2), { headers: resHeaders });
+                        return new Response(JSON.stringify(await buildVJsonProfile(clientHost, subParam, allowInsecure), null, 2), { headers: resHeaders });
+                    } else if (isRaw) {
+                        resHeaders.set("Content-Type", "text/plain; charset=utf-8");
+                        return new Response(await buildUriProfile(clientHost, subParam, allowInsecure), { headers: resHeaders });
                     } else {
                         resHeaders.set("Content-Type", "text/plain; charset=utf-8");
-                        return new Response(safeBtoa(await buildUriProfile(clientHost, targetSub, allowInsecure)), { headers: resHeaders });
+                        return new Response(safeBtoa(await buildUriProfile(clientHost, subParam, allowInsecure)), { headers: resHeaders });
                     }
                 }
             }
