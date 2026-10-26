@@ -12,6 +12,7 @@ import json
 import base64
 import gzip
 import tempfile
+import shutil
 import subprocess
 import argparse
 
@@ -102,6 +103,20 @@ def deobfuscate_worker(code):
 
     return clean_code.strip()
 
+def get_clean_env():
+    """
+    Cleans PyInstaller's LD_LIBRARY_PATH and dynamic linker environment variables
+    so spawned subprocesses (node, npm, npx, esbuild) use host system libraries.
+    """
+    env = os.environ.copy()
+    for var in ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH", "LIBPATH"]:
+        orig_var = f"{var}_ORIG"
+        if orig_var in env:
+            env[var] = env[orig_var]
+        else:
+            env.pop(var, None)
+    return env
+
 def obfuscate_worker(input_path, output_path):
     """
     Obfuscates normal worker.js using the self-contained standalone engine.
@@ -128,14 +143,16 @@ def obfuscate_worker(input_path, output_path):
     try:
         proc = subprocess.run(
             ["node", standalone_engine_path, abs_input, abs_output],
+            env=get_clean_env(),
             capture_output=True,
             text=True
         )
         if proc.returncode != 0:
-            print("[!] Error during encoding:\n", proc.stderr)
+            print("[!] Error during encoding:\n", proc.stderr or proc.stdout)
             sys.exit(1)
         else:
-            print(proc.stdout.strip())
+            if proc.stdout.strip():
+                print(proc.stdout.strip())
             print(f"[+] Successfully encoded '{input_path}' -> '{output_path}'")
     finally:
         if temp_engine_created and os.path.exists(standalone_engine_path):
@@ -144,21 +161,72 @@ def obfuscate_worker(input_path, output_path):
             except Exception:
                 pass
 
+def bundle_modular_worker(output_file="worker.bundled.js"):
+    """
+    Bundles worker.js and all src/*.js modules into a single ESM file.
+    Prefers local fast offline esbuild (no Cloudflare network calls, 20ms);
+    falls back to wrangler deploy --dry-run or direct worker.js copy.
+    """
+    env = get_clean_env()
+    abs_output = os.path.abspath(output_file)
+    os.makedirs(os.path.dirname(abs_output) or ".", exist_ok=True)
+
+    # Strategy 1: Local offline esbuild (fast, no Cloudflare network call, 20ms)
+    esbuild_cmd = [
+        "npx", "esbuild", "worker.js",
+        "--bundle",
+        "--format=esm",
+        "--target=es2022",
+        "--external:cloudflare:*",
+        "--external:node:*",
+        f"--outfile={abs_output}"
+    ]
+    try:
+        proc = subprocess.run(esbuild_cmd, env=env, capture_output=True, text=True, shell=(os.name == "nt"))
+        if proc.returncode == 0 and os.path.exists(abs_output) and os.path.getsize(abs_output) > 1000:
+            print("[+] Successfully bundled modular codebase using local esbuild.")
+            return abs_output
+    except Exception as e:
+        print(f"[!] esbuild bundle attempt warning: {e}")
+
+    # Strategy 2: Wrangler deploy --dry-run
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            wrangler_cmd = ["npx", "wrangler", "deploy", "--dry-run", f"--outdir={tmpdir}"]
+            proc = subprocess.run(wrangler_cmd, env=env, capture_output=True, text=True, shell=(os.name == "nt"))
+            for candidate in ["worker.js", "index.js"]:
+                tmp_worker = os.path.join(tmpdir, candidate)
+                if os.path.exists(tmp_worker) and os.path.getsize(tmp_worker) > 1000:
+                    shutil.copy(tmp_worker, abs_output)
+                    print("[+] Successfully bundled modular codebase using wrangler dry-run.")
+                    return abs_output
+    except Exception as e:
+        print(f"[!] wrangler dry-run bundle attempt warning: {e}")
+
+    # Strategy 3: Direct fallback to worker.js
+    print("[!] Bundler tools failed or unavailable. Falling back to base worker.js.")
+    shutil.copy("worker.js", abs_output)
+    return abs_output
+
 def bundle_and_obfuscate(output_path):
     """
     Bundles worker.js and all src/ modular dependencies into a single file,
     then obfuscates that bundle into a self-contained output_path.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        print("[*] Bundling modular codebase into single file using wrangler dry-run...")
-        cmd = ["npx", "wrangler", "deploy", "--dry-run", f"--outdir={tmpdir}"]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        bundled_file = os.path.join(tmpdir, "worker.js")
-        if not os.path.exists(bundled_file):
-            print("[!] Error during bundling:\n", proc.stderr)
-            sys.exit(1)
-        print("[*] Bundling complete. Now encoding bundled worker...")
-        obfuscate_worker(bundled_file, output_path)
+    with tempfile.NamedTemporaryFile(suffix=".bundled.js", delete=False) as tf:
+        temp_bundle = tf.name
+
+    try:
+        print("[*] Bundling modular codebase into single file...")
+        bundle_modular_worker(temp_bundle)
+        print(f"[*] Bundling complete. Now encoding bundled worker -> '{output_path}'...")
+        obfuscate_worker(temp_bundle, output_path)
+    finally:
+        if os.path.exists(temp_bundle):
+            try:
+                os.remove(temp_bundle)
+            except Exception:
+                pass
 
 def encode_all_modules(output_dir="dist"):
     """

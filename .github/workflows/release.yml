@@ -61,7 +61,7 @@ jobs:
 
       - name: Build Standalone Executable
         run: |
-          pyinstaller --onefile --clean --name nahan-deployer deploy.py
+          pyinstaller --onefile --clean --name nahan-deployer --hidden-import worker_convertor deploy.py
 
       - name: Rename Executable for Release
         shell: bash

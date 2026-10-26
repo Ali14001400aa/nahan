@@ -22,6 +22,11 @@ import subprocess
 import urllib.request
 import urllib.error
 
+try:
+    import worker_convertor
+except ImportError:
+    worker_convertor = None
+
 # ANSI Color Codes
 GREEN = "\033[92m"
 BLUE = "\033[94m"
@@ -347,13 +352,26 @@ def prepare_code(is_encoded=False):
     """Prepares the code bundle (normal modular or single-file obfuscated)."""
     if is_encoded:
         log_info("Bundling modular codebase into standalone encoded worker (`worker.encoded.js`)...")
+        # Attempt 1: Direct in-process bundling & obfuscation (fastest, standalone, works inside PyInstaller binary)
+        try:
+            if worker_convertor is not None:
+                worker_convertor.bundle_and_obfuscate("worker.encoded.js")
+                if os.path.exists("worker.encoded.js") and os.path.getsize("worker.encoded.js") > 1000:
+                    log_success("Created obfuscated standalone bundle: `worker.encoded.js`")
+                    return "worker.encoded.js"
+        except Exception as e:
+            log_warn(f"In-process bundling notice: {e}")
+
+        # Attempt 2: CLI execution fallback
         if os.path.exists("worker_convertor.py"):
-            run_command("python3 worker_convertor.py encode --bundle -o worker.encoded.js")
-            log_success("Created obfuscated standalone bundle: `worker.encoded.js`")
-            return "worker.encoded.js"
-        else:
-            log_warn("worker_convertor.py not found. Falling back to normal worker.js.")
-            return "worker.js"
+            py_bin = "python3" if sys.platform != "win32" else "python"
+            res = run_command(f"{py_bin} worker_convertor.py encode --bundle -o worker.encoded.js", check=False)
+            if res.returncode == 0 and os.path.exists("worker.encoded.js") and os.path.getsize("worker.encoded.js") > 1000:
+                log_success("Created obfuscated standalone bundle: `worker.encoded.js`")
+                return "worker.encoded.js"
+
+        log_warn("Encoded bundling was not possible. Proceeding with clean modular architecture (`worker.js`).")
+        return "worker.js"
     else:
         log_info("Using clean modular worker architecture (`worker.js`).")
         return "worker.js"
@@ -394,12 +412,28 @@ def deploy_pages(entrypoint, env_vars, project_name=DEFAULT_PROJECT_NAME):
     else:
         # Bundle into single _worker.js for Pages
         log_info("Bundling modular codebase into _worker.js for Pages...")
-        run_command("npx wrangler deploy --dry-run --outdir=tmp_pages_bundle", env=env_vars)
-        if os.path.exists("tmp_pages_bundle/worker.js"):
-            shutil.copy("tmp_pages_bundle/worker.js", dest_worker)
-            shutil.rmtree("tmp_pages_bundle", ignore_errors=True)
-        else:
-            shutil.copy("worker.js", dest_worker)
+        bundled = False
+        try:
+            if worker_convertor is not None:
+                worker_convertor.bundle_modular_worker(dest_worker)
+                bundled = os.path.exists(dest_worker) and os.path.getsize(dest_worker) > 1000
+        except Exception:
+            pass
+
+        if not bundled:
+            # Fallback 1: esbuild directly
+            res = run_command(f"npx esbuild worker.js --bundle --format=esm --target=es2022 --external:cloudflare:* --external:node:* --outfile={dest_worker}", check=False)
+            if res.returncode == 0 and os.path.exists(dest_worker) and os.path.getsize(dest_worker) > 1000:
+                bundled = True
+
+        if not bundled:
+            # Fallback 2: wrangler deploy --dry-run
+            run_command("npx wrangler deploy --dry-run --outdir=tmp_pages_bundle", env=env_vars, check=False)
+            if os.path.exists("tmp_pages_bundle/worker.js"):
+                shutil.copy("tmp_pages_bundle/worker.js", dest_worker)
+                shutil.rmtree("tmp_pages_bundle", ignore_errors=True)
+            else:
+                shutil.copy("worker.js", dest_worker)
 
     log_info(f"Executing `npx wrangler pages deploy {dist_dir}`...")
     run_command(f"npx wrangler pages deploy {dist_dir} --project-name={project_name}", env=env_vars)
